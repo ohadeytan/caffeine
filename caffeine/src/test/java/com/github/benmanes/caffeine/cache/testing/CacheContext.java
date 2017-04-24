@@ -39,11 +39,13 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.CacheWriter;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Advance;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.CacheExecutor;
+import com.github.benmanes.caffeine.cache.testing.CacheSpec.CacheExpiry;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.CacheWeigher;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Compute;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Expire;
@@ -73,17 +75,20 @@ public final class CacheContext {
   final RemovalListener<Integer, Integer> removalListener;
   final CacheWriter<Integer, Integer> cacheWriter;
   final InitialCapacity initialCapacity;
+  final Expiry<Integer, Integer> expiry;
   final Map<Integer, Integer> original;
   final Implementation implementation;
   final Listener removalListenerType;
   final CacheExecutor cacheExecutor;
   final ReferenceType valueStrength;
   final ReferenceType keyStrength;
+  final CacheExpiry expiryType;
   final Population population;
   final CacheWeigher weigher;
   final Maximum maximumSize;
   final Expire afterAccess;
   final Expire afterWrite;
+  final Expire expiryTime;
   final Executor executor;
   final FakeTicker ticker;
   final Compute compute;
@@ -112,11 +117,11 @@ public final class CacheContext {
   Map<Integer, Integer> absent;
 
   public CacheContext(InitialCapacity initialCapacity, Stats stats, CacheWeigher weigher,
-      Maximum maximumSize, Expire afterAccess, Expire afterWrite, Expire refresh,
-      Advance advance, ReferenceType keyStrength, ReferenceType valueStrength,
+      Maximum maximumSize, CacheExpiry expiryType, Expire afterAccess, Expire afterWrite,
+      Expire refresh, Advance advance, ReferenceType keyStrength, ReferenceType valueStrength,
       CacheExecutor cacheExecutor, Listener removalListenerType, Population population,
       boolean isLoading, boolean isAsyncLoading, Compute compute, Loader loader, Writer writer,
-      Implementation implementation) {
+      Implementation implementation, CacheSpec cacheSpec) {
     this.initialCapacity = requireNonNull(initialCapacity);
     this.stats = requireNonNull(stats);
     this.weigher = requireNonNull(weigher);
@@ -128,19 +133,22 @@ public final class CacheContext {
     this.keyStrength = requireNonNull(keyStrength);
     this.valueStrength = requireNonNull(valueStrength);
     this.cacheExecutor = requireNonNull(cacheExecutor);
-    this.executor = cacheExecutor.get();
+    this.executor = cacheExecutor.create();
     this.removalListenerType = removalListenerType;
     this.removalListener = removalListenerType.create();
     this.population = requireNonNull(population);
     this.loader = isLoading ? requireNonNull(loader) : null;
     this.isAsyncLoading = isAsyncLoading;
     this.writer = requireNonNull(writer);
-    this.cacheWriter = writer.get();
+    this.cacheWriter = writer.create();
     this.ticker = new SerializableFakeTicker();
     this.implementation = requireNonNull(implementation);
     this.original = new LinkedHashMap<>();
     this.initialSize = -1;
     this.compute = compute;
+    this.expiryType = expiryType;
+    this.expiryTime = cacheSpec.expiryTime();
+    this.expiry = expiryType.createExpiry(expiryTime);
   }
 
   public InitialCapacity initialCapacity() {
@@ -356,7 +364,19 @@ public final class CacheContext {
   }
 
   public boolean expires() {
-    return (afterAccess != Expire.DISABLED) || (afterWrite != Expire.DISABLED);
+    return expiresVariably() || (afterAccess != Expire.DISABLED) || (afterWrite != Expire.DISABLED);
+  }
+
+  public boolean expiresVariably() {
+    return (expiryType != CacheExpiry.DISABLED);
+  }
+
+  public CacheExpiry expiryType() {
+    return expiryType;
+  }
+
+  public Expire expiryTime() {
+    return expiryTime;
   }
 
   public Expire expireAfterAccess() {
@@ -424,6 +444,8 @@ public final class CacheContext {
         .add("population", population)
         .add("maximumSize", maximumSize)
         .add("weigher", weigher)
+        .add("expiry", expiryType)
+        .add("expiryTime", expiryTime)
         .add("afterAccess", afterAccess)
         .add("afterWrite", afterWrite)
         .add("refreshAfterWrite", refresh)

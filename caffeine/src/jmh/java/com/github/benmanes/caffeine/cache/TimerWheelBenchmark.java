@@ -66,33 +66,33 @@ public class TimerWheelBenchmark {
 
   @Benchmark
   public void reschedule(ThreadState threadState) {
-    timer.setAccessTime(times[threadState.index++ & MASK]);
+    timer.setVariableTime(times[threadState.index++ & MASK]);
     timerWheel.reschedule(timer);
   }
 
   @Benchmark
   public void expire(ThreadState threadState) {
-    long accessTime = times[threadState.index++ & MASK];
-    timer.setAccessTime(accessTime);
-    timerWheel.nanos = accessTime - DELTA;
+    long time = times[threadState.index++ & MASK];
+    timer.setVariableTime(time);
+    timerWheel.nanos = (time - DELTA);
     timerWheel.schedule(timer);
-    timerWheel.advance(accessTime);
+    timerWheel.advance(time);
   }
 
   private static final class Timer implements Node<Integer, Integer> {
     Node<Integer, Integer> prev;
     Node<Integer, Integer> next;
-    long accessTime;
+    long time;
 
-    Timer(long accessTime) {
-      setAccessTime(accessTime);
+    Timer(long time) {
+      setVariableTime(time);
     }
 
-    @Override public long getAccessTime() {
-      return accessTime;
+    @Override public long getVariableTime() {
+      return time;
     }
-    @Override public void setAccessTime(long accessTime) {
-      this.accessTime = accessTime;
+    @Override public void setVariableTime(long time) {
+      this.time = time;
     }
     @Override public Node<Integer, Integer> getPreviousInAccessOrder() {
       return prev;

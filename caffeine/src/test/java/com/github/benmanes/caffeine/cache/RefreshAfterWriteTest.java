@@ -49,6 +49,7 @@ import com.github.benmanes.caffeine.cache.testing.CacheProvider;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Advance;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.CacheExecutor;
+import com.github.benmanes.caffeine.cache.testing.CacheSpec.CacheExpiry;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Compute;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Expire;
 import com.github.benmanes.caffeine.cache.testing.CacheSpec.Implementation;
@@ -91,7 +92,7 @@ public final class RefreshAfterWriteTest {
   @CheckNoWriter
   @Test(dataProvider = "caches")
   @CacheSpec(refreshAfterWrite = Expire.ONE_MINUTE, loader = Loader.NEGATIVE,
-      population = { Population.SINGLETON, Population.PARTIAL, Population.FULL })
+      population = { Population.SINGLETON, Population.PARTIAL, Population.FULL }, expiry = CacheExpiry.ACCESS)
   public void getIfPresent(AsyncLoadingCache<Integer, Integer> cache, CacheContext context) {
     context.ticker().advance(30, TimeUnit.SECONDS);
     assertThat(cache.getIfPresent(context.middleKey()), is(futureOf(-context.middleKey())));

@@ -87,15 +87,19 @@ final class TimerWheel<K, V> {
    */
   public void advance(long currentTimeNanos) {
     long previousTimeNanos = nanos;
-    nanos = currentTimeNanos;
-
-    for (int i = 0; i < SHIFT.length; i++) {
-      int prevTicks = (int) (previousTimeNanos >>> SHIFT[i]);
-      int currentTicks = (int) (currentTimeNanos >>> SHIFT[i]);
-      if ((currentTicks - prevTicks) <= 0) {
-        break;
+    try {
+      nanos = currentTimeNanos;
+      for (int i = 0; i < SHIFT.length; i++) {
+        int prevTicks = (int) (previousTimeNanos >>> SHIFT[i]);
+        int currentTicks = (int) (currentTimeNanos >>> SHIFT[i]);
+        if ((currentTicks - prevTicks) <= 0) {
+          break;
+        }
+        expire(i, previousTimeNanos, currentTimeNanos);
       }
-      expire(i, previousTimeNanos, currentTimeNanos);
+    } catch (Throwable t) {
+      nanos = previousTimeNanos;
+      throw t;
     }
   }
 
@@ -125,21 +129,30 @@ final class TimerWheel<K, V> {
     int mask = timerWheel.length - 1;
     for (int i = start; i < end; i++) {
       Node<K, V> sentinel = timerWheel[(i & mask)];
-      Node<K, V> node = sentinel.getNextInAccessOrder();
-      sentinel.setPreviousInAccessOrder(sentinel);
-      sentinel.setNextInAccessOrder(sentinel);
+      Node<K, V> prev = sentinel.getPreviousInVariableOrder();
+      Node<K, V> node = sentinel.getNextInVariableOrder();
+      sentinel.setPreviousInVariableOrder(sentinel);
+      sentinel.setNextInVariableOrder(sentinel);
 
       while (node != sentinel) {
-        Node<K, V> next = node.getNextInAccessOrder();
-        node.setPreviousInAccessOrder(null);
-        node.setNextInAccessOrder(null);
+        Node<K, V> next = node.getNextInVariableOrder();
+        node.setPreviousInVariableOrder(null);
+        node.setNextInVariableOrder(null);
 
-        if ((node.getAccessTime() > currentTimeNanos)
-            || !cache.evictEntry(node, RemovalCause.EXPIRED, nanos)) {
-          Node<K, V> newSentinel = findBucket(node.getAccessTime());
-          link(newSentinel, node);
+        try {
+          if (((node.getVariableTime() - currentTimeNanos) > 0)
+              || !cache.evictEntry(node, RemovalCause.EXPIRED, nanos)) {
+            Node<K, V> newSentinel = findBucket(node.getVariableTime());
+            link(newSentinel, node);
+          }
+          node = next;
+        } catch (Throwable t) {
+          node.setPreviousInVariableOrder(sentinel.getPreviousInVariableOrder());
+          node.setNextInVariableOrder(next);
+          sentinel.getPreviousInVariableOrder().setNextInVariableOrder(node);
+          sentinel.setPreviousInVariableOrder(prev);
+          throw t;
         }
-        node = next;
       }
     }
   }
@@ -150,7 +163,7 @@ final class TimerWheel<K, V> {
    * @param node the entry in the cache
    */
   public void schedule(Node<K, V> node) {
-    Node<K, V> sentinel = findBucket(node.getAccessTime());
+    Node<K, V> sentinel = findBucket(node.getVariableTime());
     link(sentinel, node);
   }
 
@@ -160,7 +173,7 @@ final class TimerWheel<K, V> {
    * @param node the entry in the cache
    */
   public void reschedule(Node<K, V> node) {
-    if (node.getNextInAccessOrder() != null) {
+    if (node.getNextInVariableOrder() != null) {
       unlink(node);
       schedule(node);
     }
@@ -173,8 +186,8 @@ final class TimerWheel<K, V> {
    */
   public void deschedule(Node<K, V> node) {
     unlink(node);
-    node.setNextInAccessOrder(null);
-    node.setPreviousInAccessOrder(null);
+    node.setNextInVariableOrder(null);
+    node.setPreviousInVariableOrder(null);
   }
 
   /**
@@ -203,22 +216,22 @@ final class TimerWheel<K, V> {
 
   /** Adds the entry at the tail of the bucket's list. */
   void link(Node<K, V> sentinel, Node<K, V> node) {
-    node.setPreviousInAccessOrder(sentinel.getPreviousInAccessOrder());
-    node.setNextInAccessOrder(sentinel);
+    node.setPreviousInVariableOrder(sentinel.getPreviousInVariableOrder());
+    node.setNextInVariableOrder(sentinel);
 
-    sentinel.getPreviousInAccessOrder().setNextInAccessOrder(node);
-    sentinel.setPreviousInAccessOrder(node);
+    sentinel.getPreviousInVariableOrder().setNextInVariableOrder(node);
+    sentinel.setPreviousInVariableOrder(node);
   }
 
   /** Removes the entry from its bucket, if scheduled. */
   void unlink(Node<K, V> node) {
-    Node<K, V> prev = node.getPreviousInAccessOrder();
-    Node<K, V> next = node.getNextInAccessOrder();
+    Node<K, V> prev = node.getPreviousInVariableOrder();
+    Node<K, V> next = node.getNextInVariableOrder();
     if (next != null) {
-      next.setPreviousInAccessOrder(prev);
+      next.setPreviousInVariableOrder(prev);
     }
     if (prev != null) {
-      prev.setNextInAccessOrder(next);
+      prev.setNextInVariableOrder(next);
     }
   }
 
@@ -229,8 +242,8 @@ final class TimerWheel<K, V> {
       Map<Integer, Integer> buckets = new TreeMap<>();
       for (int j = 0; j < wheel[i].length; j++) {
         int events = 0;
-        for (Node<K, V> node = wheel[i][j].getNextInAccessOrder();
-            node != wheel[i][j]; node = node.getNextInAccessOrder()) {
+        for (Node<K, V> node = wheel[i][j].getNextInVariableOrder();
+            node != wheel[i][j]; node = node.getNextInVariableOrder()) {
           events++;
         }
         if (events > 0) {
@@ -251,16 +264,16 @@ final class TimerWheel<K, V> {
       prev = next = this;
     }
 
-    @Override public Node<K, V> getPreviousInAccessOrder() {
+    @Override public Node<K, V> getPreviousInVariableOrder() {
       return prev;
     }
-    @Override public void setPreviousInAccessOrder(@Nullable Node<K, V> prev) {
+    @Override public void setPreviousInVariableOrder(@Nullable Node<K, V> prev) {
       this.prev = prev;
     }
-    @Override public Node<K, V> getNextInAccessOrder() {
+    @Override public Node<K, V> getNextInVariableOrder() {
       return next;
     }
-    @Override public void setNextInAccessOrder(@Nullable Node<K, V> next) {
+    @Override public void setNextInVariableOrder(@Nullable Node<K, V> next) {
       this.next = next;
     }
 
