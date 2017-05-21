@@ -129,4 +129,19 @@ public final class AdaptiveResetCountMin4 extends CountMin4 {
       }
     }
   }
+
+  public int getStep() {
+  	return step;
+  }
+
+  public int getEventsToCount() {
+	return eventsToCount;
+  }
+
+  public int getPeriod() {
+	return period;
+  }
+
+  
+  
 }

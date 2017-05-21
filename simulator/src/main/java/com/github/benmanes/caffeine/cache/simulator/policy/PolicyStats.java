@@ -17,6 +17,9 @@ package com.github.benmanes.caffeine.cache.simulator.policy;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Stopwatch;
 
@@ -36,7 +39,12 @@ public final class PolicyStats {
   private long rejectedCount;
   private long operationCount;
 
-  public PolicyStats(String name) {
+  private List<Long> extraInfo = new ArrayList<>();
+  public List<Long> getExtraInfo() {
+	return extraInfo;
+}
+
+public PolicyStats(String name) {
     this.name = requireNonNull(name);
     this.stopwatch = Stopwatch.createUnstarted();
   }

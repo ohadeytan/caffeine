@@ -77,6 +77,12 @@ public final class TinyLfu implements Admittor {
   public boolean admit(long candidateKey, long victimKey) {
     sketch.reportMiss();
 
+    if (sketch instanceof AdaptiveResetCountMin4) {
+        if (((AdaptiveResetCountMin4) sketch).getEventsToCount() == ((AdaptiveResetCountMin4) sketch).getPeriod()) {
+        	policyStats.getExtraInfo().add((long) ((AdaptiveResetCountMin4) sketch).getStep());
+        }    	
+    }
+    
     long candidateFreq = sketch.frequency(candidateKey);
     long victimFreq = sketch.frequency(victimKey);
     if (candidateFreq > victimFreq) {

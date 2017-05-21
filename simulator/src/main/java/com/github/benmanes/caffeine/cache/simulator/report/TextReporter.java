@@ -65,10 +65,22 @@ public abstract class TextReporter implements Reporter {
     results.sort(comparator());
     String report = assemble(results);
     String output = settings.report().output();
+
+    String extraReport = "";
+    for (PolicyStats policyStats : results) {
+	    if (!policyStats.getExtraInfo().isEmpty()) {
+	    	extraReport += policyStats.name() + ","
+	    			+ policyStats.getExtraInfo().toString().replaceAll("\\[|\\]|\\ ", "") + '\n';
+	    }
+    }    	
+
     if (output.equalsIgnoreCase("console")) {
-      System.out.println(report);
+      System.out.println(report+extraReport);
     } else {
       Files.write(Paths.get(output), report.getBytes(UTF_8));
+      if (!extraReport.isEmpty()) {
+	      Files.write(Paths.get(output.replace(".csv", "-extra.csv")), extraReport.getBytes(UTF_8));
+      }
     }
   }
 
