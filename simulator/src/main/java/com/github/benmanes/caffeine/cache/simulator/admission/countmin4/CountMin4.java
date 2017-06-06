@@ -38,7 +38,7 @@ public abstract class CountMin4 implements Frequency {
 
   protected int tableMask;
   protected long[] table;
-  protected int step = 1;
+  protected int step;
 
   /**
    * Creates a frequency sketch that can accurately estimate the popularity of elements given
@@ -49,6 +49,7 @@ public abstract class CountMin4 implements Frequency {
     conservative = settings.tinyLfu().conservative();
     checkArgument(settings.randomSeed() != 0);
     randomSeed = settings.randomSeed();
+    step = settings.tinyLfu().countMin4().step();
 
     double countersMultiplier = settings.tinyLfu().countMin4().countersMultiplier();
     long counters = (long) (countersMultiplier * settings.maximumSize());

@@ -135,6 +135,9 @@ public class BasicSettings {
       public String reset() {
         return config().getString("tiny-lfu.count-min-4.reset");
       }
+      public int step() {
+          return config().getInt("tiny-lfu.count-min-4.step");
+      }
       public double countersMultiplier() {
         return config().getDouble("tiny-lfu.count-min-4.counters-multiplier");
       }
