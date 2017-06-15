@@ -17,6 +17,7 @@ package com.github.benmanes.caffeine.cache.simulator.admission;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.AdaptiveResetCountMin4;
+import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.HintedAdaptiveResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.IncrementalResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin64.CountMin64TinyLfu;
@@ -51,6 +52,8 @@ public final class TinyLfu implements Admittor {
         return new IncrementalResetCountMin4(config);
       } else if (reset.equalsIgnoreCase("adaptive")) {
         return new AdaptiveResetCountMin4(config);
+      } else if (reset.equalsIgnoreCase("hinted")) {
+        return new HintedAdaptiveResetCountMin4(config);
       }
     } else if (type.equalsIgnoreCase("count-min-64")) {
       return new CountMin64TinyLfu(config);
@@ -82,7 +85,14 @@ public final class TinyLfu implements Admittor {
         	policyStats.getExtraInfo().add((long) ((AdaptiveResetCountMin4) sketch).getStep());
         }    	
     }
-    
+
+    if (sketch instanceof HintedAdaptiveResetCountMin4) {
+        if (((HintedAdaptiveResetCountMin4) sketch).getEventsToCount() == ((HintedAdaptiveResetCountMin4) sketch).getPeriod()) {
+        	policyStats.getExtraInfo().add((long) ((HintedAdaptiveResetCountMin4) sketch).getHintSum());
+        	policyStats.getExtraInfo().add((long) ((HintedAdaptiveResetCountMin4) sketch).getHintCount());
+        }    	
+    }
+
     long candidateFreq = sketch.frequency(candidateKey);
     long victimFreq = sketch.frequency(victimKey);
     if (candidateFreq > victimFreq) {
