@@ -134,8 +134,21 @@ public final class AdaptiveResetCountMin4 extends CountMin4 {
   	return step;
   }
 
+  public void setStep(int x) {
+  	step = x;      
+  	if (step < 1) {
+      step = 1;
+    } else if (step > 15) {
+      step = 15;
+    }
+  }
+
   public int getEventsToCount() {
 	return eventsToCount;
+  }
+
+  public void resetEventsToCount() {
+	eventsToCount = period;
   }
 
   public int getPeriod() {
