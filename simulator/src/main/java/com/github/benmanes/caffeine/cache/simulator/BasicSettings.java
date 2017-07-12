@@ -138,6 +138,12 @@ public class BasicSettings {
       public int step() {
           return config().getInt("tiny-lfu.count-min-4.step");
       }
+      public List<Integer> replay() {
+    	  return config().getIntList("tiny-lfu.count-min-4.replay");
+      }
+      public boolean median() {
+    	  return config().getBoolean("tiny-lfu.count-min-4.median");
+      }
       public double countersMultiplier() {
         return config().getDouble("tiny-lfu.count-min-4.counters-multiplier");
       }

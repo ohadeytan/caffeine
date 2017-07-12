@@ -94,6 +94,14 @@ public final class TinyLfu implements Admittor {
         }    	
     }
 
+    if (sketch instanceof HintedResetCountMin4) {
+        if (((HintedResetCountMin4) sketch).getEventsToCount() == ((HintedResetCountMin4) sketch).getPeriod()) {
+        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getHintSum());
+        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getHintCount());
+        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getMedianHint());
+        }    	
+    }
+
     long candidateFreq = sketch.frequency(candidateKey);
     long victimFreq = sketch.frequency(victimKey);
     if (candidateFreq > victimFreq) {
