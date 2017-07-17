@@ -16,7 +16,7 @@ public class HintedResetCountMin4 implements Frequency {
 	int hintCount;
 	int prevHintSum;
 	int prevHintCount;
-	Counter c;
+	Hinter h;
 	int prevMedian;
 	List<Integer> replay;
 	boolean median;
@@ -25,7 +25,7 @@ public class HintedResetCountMin4 implements Frequency {
 		super();
 		this.sketch = new AdaptiveResetCountMin4(config);
 		this.shadowSketch = new PeriodicResetCountMin4(config);
-		this.c = new Counter();
+		this.h = new Hinter();
 		
 	    BasicSettings settings = new BasicSettings(config);
 		this.replay = settings.tinyLfu().countMin4().replay();
@@ -50,9 +50,7 @@ public class HintedResetCountMin4 implements Frequency {
 		sketch.increment(e);
 	    int hint = shadowSketch.frequency(e);
 	    if (hint > 0) {
-	    	hintSum += hint;
-	    	hintCount++;
-		    c.increment(hint);
+		    h.increment(hint);
 	    }
 	    shadowSketch.increment(e);
 	}
@@ -61,25 +59,28 @@ public class HintedResetCountMin4 implements Frequency {
 	public void reportMiss() {
 	  if (sketch.getEventsToCount() <= 0) {
 		  sketch.resetEventsToCount();
-		  int hint;
-		  if (!replay.isEmpty()) {
-			  hint = replay.get(0);
-			  replay.remove(0);
-		  } else if (median) {
-			  hint = c.getMedian();
-		  } else {
-			 hint = hintSum / hintCount;
-		  }
-		  hint = (hint < 4) ? 0 : hint - 4;
-		  sketch.setStep(1 << hint);
-		  prevHintSum = hintSum;
-		  prevHintCount = hintCount;
-		  prevMedian = c.getMedian();
-		  hintSum = 0;
-		  hintCount = 0;
-		  c.reset();
-		  
+		  int hint = getHint();
+		  sketch.setStep(hintToStep(hint));
+		  prevHintSum = h.getSum();
+		  prevHintCount = h.getCount();
+		  prevMedian = h.getMedian();
+		  h.reset();
 	  }
+	}
+	
+	private int getHint() {
+		if (!replay.isEmpty()) {
+			return replay.remove(0);
+		} else if (median) {
+			return h.getMedian();
+		} else {
+			return h.getAverage();
+		}
+	}
+	
+	private int hintToStep(int hint) {
+		hint = (hint < 4) ? 0 : hint - 4;
+		return 1 << hint;
 	}
 	
     public int getEventsToCount() {
@@ -102,16 +103,21 @@ public class HintedResetCountMin4 implements Frequency {
 		return prevMedian;
 	}
 	
-	private class Counter {
+	private class Hinter {
+		int sum;
+		int count;
 		int[] freq = new int[16];
 		
-		public Counter() {}
+		public Hinter() {}
 		
 		public void increment(int i) {
+			sum += i;
+			count++;
 			freq[i]++;
 		}
 		
 		public void reset() {
+			sum = count = 0;
 			Arrays.fill(freq, 0);
 		}
 		
@@ -125,6 +131,18 @@ public class HintedResetCountMin4 implements Frequency {
 				}
 			}
 			return 0;
+		}
+		
+		public int getAverage() {
+			return sum / count;
+		}
+		
+		public int getSum() {
+			return sum;
+		}
+		
+		public int getCount() {
+			return count;
 		}
 	}
 
