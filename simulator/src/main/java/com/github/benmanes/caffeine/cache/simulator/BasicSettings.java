@@ -144,6 +144,9 @@ public class BasicSettings {
       public boolean median() {
     	  return config().getBoolean("tiny-lfu.count-min-4.median");
       }
+      public int formula() {
+    	  return config().getInt("tiny-lfu.count-min-4.formula");
+      }
       public double countersMultiplier() {
         return config().getDouble("tiny-lfu.count-min-4.counters-multiplier");
       }

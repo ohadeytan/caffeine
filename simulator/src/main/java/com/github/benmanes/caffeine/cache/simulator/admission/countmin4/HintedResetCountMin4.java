@@ -20,6 +20,7 @@ public class HintedResetCountMin4 implements Frequency {
 	int prevMedian;
 	List<Integer> replay;
 	boolean median;
+	int formula;
 	
 	public HintedResetCountMin4(Config config) {
 		super();
@@ -30,6 +31,7 @@ public class HintedResetCountMin4 implements Frequency {
 	    BasicSettings settings = new BasicSettings(config);
 		this.replay = settings.tinyLfu().countMin4().replay();
 		this.median = settings.tinyLfu().countMin4().median();
+		this.formula = settings.tinyLfu().countMin4().formula();
 		int hint;
 		if (!replay.isEmpty()) {
 			hint = replay.get(0);
@@ -79,8 +81,20 @@ public class HintedResetCountMin4 implements Frequency {
 	}
 	
 	private int hintToStep(int hint) {
-		hint = (hint < 4) ? 0 : hint - 4;
-		return 1 << hint;
+		switch (formula) {
+		case 1:
+			hint = (hint < 4) ? 0 : hint - 4;
+			return 1 << hint;
+		case 2:
+			return (hint < 4) ? 1 : 2*(hint - 4);
+		case 3:
+			return Math.min((hint < 4) ? 1 : 2*(hint - 4), 14); 
+		case 4:
+			hint = (hint < 4) ? 0 : hint - 4;
+			return Math.min(1 << hint, 14);
+		default:
+			return 1;
+		}
 	}
 	
     public int getEventsToCount() {
