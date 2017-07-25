@@ -117,7 +117,7 @@ public class HintedResetCountMin4 implements Frequency {
 		return prevMedian;
 	}
 	
-	private class Hinter {
+	public static class Hinter {
 		int sum;
 		int count;
 		int[] freq = new int[16];

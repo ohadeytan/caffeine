@@ -29,7 +29,9 @@ import com.typesafe.config.Config;
 @SuppressWarnings("ImmutableEnumChecker")
 enum HillClimberType {
   SIMPLE(SimpleClimber::new),
-  SIMULATED_ANNEALING(SimulatedAnnealingClimber::new);
+  SIMULATED_ANNEALING(SimulatedAnnealingClimber::new),
+  HINTED(HintedClimber::new);
+	
 
   private final Function<Config, HillClimber> factory;
 
