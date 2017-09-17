@@ -1,22 +1,20 @@
 package com.github.benmanes.caffeine.cache.simulator.admission.countmin4;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.Indicator;
 import com.typesafe.config.Config;
 
 public class HintedResetCountMin4 implements Frequency {
 	private final AdaptiveResetCountMin4 sketch;
-	private final PeriodicResetCountMin4 shadowSketch;
 	
 	int hintSum;
 	int hintCount;
 	int prevHintSum;
 	int prevHintCount;
-	Hinter h;
+	Indicator indicator;
 	int prevMedian;
 	List<Integer> replay;
 	boolean median;
@@ -25,8 +23,7 @@ public class HintedResetCountMin4 implements Frequency {
 	public HintedResetCountMin4(Config config) {
 		super();
 		this.sketch = new AdaptiveResetCountMin4(config);
-		this.shadowSketch = new PeriodicResetCountMin4(config);
-		this.h = new Hinter();
+		this.indicator = new Indicator(config);
 		
 	    BasicSettings settings = new BasicSettings(config);
 		this.replay = settings.tinyLfu().countMin4().replay();
@@ -50,11 +47,7 @@ public class HintedResetCountMin4 implements Frequency {
 	@Override
 	public void increment(long e) {
 		sketch.increment(e);
-	    int hint = shadowSketch.frequency(e);
-	    if (hint > 0) {
-		    h.increment(hint);
-	    }
-	    shadowSketch.increment(e);
+		indicator.record(e);
 	}
 
 	@Override
@@ -63,20 +56,17 @@ public class HintedResetCountMin4 implements Frequency {
 		  sketch.resetEventsToCount();
 		  int hint = getHint();
 		  sketch.setStep(hintToStep(hint));
-		  prevHintSum = h.getSum();
-		  prevHintCount = h.getCount();
-		  prevMedian = h.getMedian();
-		  h.reset();
+		  indicator.reset();
 	  }
 	}
 	
 	private int getHint() {
 		if (!replay.isEmpty()) {
 			return replay.remove(0);
-		} else if (median) {
-			return h.getMedian();
+//		} else if (median) {
+//			return h.getMedian();
 		} else {
-			return h.getAverage();
+			return (int) indicator.getHint();
 		}
 	}
 	
@@ -115,49 +105,5 @@ public class HintedResetCountMin4 implements Frequency {
 	
 	public int getMedianHint() {
 		return prevMedian;
-	}
-	
-	public static class Hinter {
-		int sum;
-		int count;
-		int[] freq = new int[16];
-		
-		public Hinter() {}
-		
-		public void increment(int i) {
-			sum += i;
-			count++;
-			freq[i]++;
-		}
-		
-		public void reset() {
-			sum = count = 0;
-			Arrays.fill(freq, 0);
-		}
-		
-		public int getMedian() {
-			int mid = (1+IntStream.of(freq).sum()) / 2;
-			int count = 0;
-			for (int i = 0; i < 16; i++) {
-				count += freq[i];
-				if (count >= mid) {
-					return i;
-				}
-			}
-			return 0;
-		}
-		
-		public int getAverage() {
-			return sum / count;
-		}
-		
-		public int getSum() {
-			return sum;
-		}
-		
-		public int getCount() {
-			return count;
-		}
-	}
-
+	}	
 }

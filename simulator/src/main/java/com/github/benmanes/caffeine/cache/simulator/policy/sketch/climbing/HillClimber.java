@@ -23,7 +23,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-interface HillClimber {
+public interface HillClimber {
 
   /**
    * Records that a hit occurred.

@@ -33,6 +33,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
+import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.HintedResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.Adaptation;
@@ -277,6 +278,13 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
   public void finished() {
     printSegmentSizes();
 
+    if (climber instanceof HintedClimber) {
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumHint());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumSkew());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumPercent());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getPeriods());
+   	}    	
+    
     long windowSize = data.values().stream().filter(n -> n.queue == WINDOW).count();
     long probationSize = data.values().stream().filter(n -> n.queue == PROBATION).count();
     long protectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).count();

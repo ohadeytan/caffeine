@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
+import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.ArcIndicatorPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.ArcPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.CarPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.CartPolicy;
@@ -161,6 +162,7 @@ public final class Registry {
 
   private static void registerAdaptive(Map<String, Function<Config, Set<Policy>>> factories) {
     factories.put("adaptive.Arc", ArcPolicy::policies);
+    factories.put("adaptive.ArcIndicator", ArcIndicatorPolicy::policies);
     factories.put("adaptive.Car", CarPolicy::policies);
     factories.put("adaptive.Cart", CartPolicy::policies);
   }

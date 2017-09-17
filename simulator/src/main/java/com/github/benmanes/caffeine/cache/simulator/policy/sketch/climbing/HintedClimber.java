@@ -3,8 +3,7 @@
  */
 package com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing;
 
-import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
-import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.HintedResetCountMin4.Hinter;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.Indicator;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberWindowTinyLfuPolicy.HillClimberWindowTinyLfuSettings;
 import com.typesafe.config.Config;
 
@@ -14,19 +13,15 @@ import com.typesafe.config.Config;
  */
 public final class HintedClimber implements HillClimber {
 
-	private final Hinter h;
-	private final PeriodicResetCountMin4 shadowSketch;
+	private final Indicator indicator;
 //	private final double[] hintToPercent = {0, 0, 1, 2, 4, 8, 16, 32, 68, 84, 92, 96, 98, 99, 100, 100};
 //	private final double[] hintToPercent = {0, 1, 1, 1, 1, 2, 4, 8, 16, 32, 68, 84, 92, 96, 98, 99};
 	private final double[] hintToPercent = {0, 1, 1, 1, 1, 2, 3, 5, 7, 10, 12, 15, 17, 20, 25, 30};
 	private double prevPercent;
 	private int cacheSize;
-	private int sample;
 	
 	public HintedClimber(Config config) {
-		this.shadowSketch = new PeriodicResetCountMin4(config);
-		this.h = new Hinter();
-		
+		this.indicator = new Indicator(config);
 	    HillClimberWindowTinyLfuSettings settings = new HillClimberWindowTinyLfuSettings(config);
 		this.prevPercent = 1 - settings.percentMain().get(0);
 		this.cacheSize = settings.maximumSize();
@@ -34,31 +29,25 @@ public final class HintedClimber implements HillClimber {
 	
 	@Override
 	public void onHit(long key, QueueType queue) {
-		int hint = shadowSketch.frequency(key);
-		if (hint > 0) {
-			h.increment(hint);
-		}
-		shadowSketch.increment(key);
+		indicator.record(key);
 	}
 
 	@Override
 	public void onMiss(long key) {
-		int hint = shadowSketch.frequency(key);
-		if (hint > 0) {
-			h.increment(hint);
-		}
-		shadowSketch.increment(key);
+		indicator.record(key);
 	}
 
 	@Override
 	public Adaptation adapt(int windowSize, int protectedSize) {
-		sample++;
-		if (sample == cacheSize*10) {
+		if (indicator.getSample() == cacheSize*10) {
 			double oldPercent = prevPercent;
-			double newPercent = prevPercent = hintToPercent[h.getAverage()] / 100.0;
-
-			h.reset();
-			sample = 0;
+			double skew = indicator.getSkew();
+			double newPercent = prevPercent = (indicator.getHint()*2*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)) / 100.0;
+			sumHint += indicator.getHint();
+			sumSkew += Math.floor(skew*1000);
+			sumPercent += Math.floor(newPercent*100);
+			periods++;
+			indicator.reset();
 			if (newPercent > oldPercent) {
 				return new Adaptation(Adaptation.Type.INCREASE_WINDOW, (int)((newPercent - oldPercent)*cacheSize));
 			}
@@ -66,4 +55,27 @@ public final class HintedClimber implements HillClimber {
 		}
 		return new Adaptation(Adaptation.Type.HOLD, 0);
 	}
+	
+	long sumHint;
+	long sumSkew;
+	long sumPercent;
+	long periods;
+
+	public long getSumHint() {
+		return sumHint;
+	}
+
+	public long getSumSkew() {
+		return sumSkew;
+	}
+
+	public long getSumPercent() {
+		return sumPercent;
+	}
+
+	public long getPeriods() {
+		return periods;
+	}
+
+	
 }

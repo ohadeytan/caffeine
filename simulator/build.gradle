@@ -25,6 +25,9 @@ dependencies {
   compile benchmarkLibraries.elasticSearch
 
   testCompile testLibraries.testng
+  
+  compile group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
+
 }
 
 test {
