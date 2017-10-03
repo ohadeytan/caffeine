@@ -54,6 +54,11 @@ public class Indicator {
 		return hinter.getAverage();
 	}
 	
+	public double getIndicator() {
+		double skew = getSkew();
+		return (getHint() - 1)*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/14.0;
+	}
+	
 	private static class Hinter {
 		int sum;
 		int count;

@@ -42,7 +42,8 @@ public final class HintedClimber implements HillClimber {
 		if (indicator.getSample() == cacheSize*10) {
 			double oldPercent = prevPercent;
 			double skew = indicator.getSkew();
-			double newPercent = prevPercent = (indicator.getHint()*2*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)) / 100.0;
+//			double newPercent = prevPercent = (indicator.getHint()*2*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)) / 100.0;
+			double newPercent = prevPercent = indicator.getIndicator()*30 / 100.0;
 			sumHint += indicator.getHint();
 			sumSkew += Math.floor(skew*1000);
 			sumPercent += Math.floor(newPercent*100);
