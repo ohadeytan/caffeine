@@ -28,9 +28,9 @@ public class Indicator {
 
 	public void record(long key) {
 	    int hint = sketch.frequency(key);
-	    if (hint > 0) {
+//	    if (hint > 0) {
 		    hinter.increment(hint);
-	    }
+//	    }
 	    sketch.increment(key);
 	    estSkew.record(key);
 	    sample++;
@@ -56,7 +56,8 @@ public class Indicator {
 	
 	public double getIndicator() {
 		double skew = getSkew();
-		return (getHint() - 1)*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/14.0;
+//		return (getHint() - 1)*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/14.0;
+		return (getHint())*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/15.0;
 	}
 	
 	private static class Hinter {
@@ -127,5 +128,35 @@ public class Indicator {
 			getTopK(k).forEachOrdered(freq -> regression.addData(Math.log(idx[0]++), Math.log(freq)));
 			return -regression.getSlope();
 		}
+
+		public int[] getFreq() {
+			return freq.values().stream().sorted().mapToInt(i->i).toArray();
+		}
 	}
+
+	public long getGini() {
+		int[] a = estSkew.getFreq();
+		double n = a.length;
+		double ginisum = 0;
+		double sum = 0;
+		for (int i = 0; i < a.length; i++) {
+			ginisum += 2.0 * (i+1) * a[i];
+			sum += a[i];
+			
+		}
+		ginisum = (ginisum / (sum*n)) - (n+1) / n; 
+		return (long) (ginisum*1000);
+	}
+
+	public long getEntropy() {
+		int[] a = estSkew.getFreq();
+		double entsum = 0;
+		double sum = IntStream.of(a).sum();
+		for (int i = 0; i < a.length; i++) {
+			double x = a[i]/sum;
+			entsum += (x) * Math.log(x);
+		}
+		return (long) (-entsum*1000);
+	}
+
 }

@@ -43,10 +43,11 @@ public final class HintedClimber implements HillClimber {
 			double oldPercent = prevPercent;
 			double skew = indicator.getSkew();
 //			double newPercent = prevPercent = (indicator.getHint()*2*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)) / 100.0;
-			double newPercent = prevPercent = indicator.getIndicator()*30 / 100.0;
+			double newPercent = prevPercent = indicator.getIndicator()*40 / 100.0;
 			sumHint += indicator.getHint();
 			sumSkew += Math.floor(skew*1000);
 			sumPercent += Math.floor(newPercent*100);
+			sumGini += indicator.getGini();
 			periods++;
 			indicator.reset();
 			if (newPercent > oldPercent) {
@@ -60,6 +61,7 @@ public final class HintedClimber implements HillClimber {
 	long sumHint;
 	long sumSkew;
 	long sumPercent;
+	long sumGini;
 	long periods;
 
 	public long getSumHint() {
@@ -76,6 +78,14 @@ public final class HintedClimber implements HillClimber {
 
 	public long getPeriods() {
 		return periods;
+	}
+
+	public Long getGini() {
+		return (long) indicator.getGini();
+	}
+
+	public Long getEntropy() {
+		return (long) indicator.getEntropy();
 	}
 
 	

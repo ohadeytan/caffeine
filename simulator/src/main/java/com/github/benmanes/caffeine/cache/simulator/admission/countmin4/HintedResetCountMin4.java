@@ -54,34 +54,36 @@ public class HintedResetCountMin4 implements Frequency {
 	public void reportMiss() {
 	  if (sketch.getEventsToCount() <= 0) {
 		  sketch.resetEventsToCount();
-		  int hint = getHint();
-		  sketch.setStep(hintToStep(hint));
+		  double ind = getIndicator();
+		  sketch.setStep(hintToStep(ind));
 		  indicator.reset();
 	  }
 	}
 	
-	private int getHint() {
+	private double getIndicator() {
 		if (!replay.isEmpty()) {
 			return replay.remove(0);
 //		} else if (median) {
 //			return h.getMedian();
 		} else {
-			return (int) indicator.getHint();
+			return indicator.getIndicator();
 		}
 	}
 	
-	private int hintToStep(int hint) {
+	private int hintToStep(double ind) {
+		ind = ind*15;
 		switch (formula) {
-		case 1:
-			hint = (hint < 4) ? 0 : hint - 4;
-			return 1 << hint;
+//		case 1:
+//			ind = (ind < 4) ? 0 : ind - 4;
+//			return 1 << ind;
 		case 2:
-			return (hint < 4) ? 1 : 2*(hint - 4);
-		case 3:
-			return Math.min((hint < 4) ? 1 : 2*(hint - 4), 14); 
-		case 4:
-			hint = (hint < 4) ? 0 : hint - 4;
-			return Math.min(1 << hint, 14);
+//			return (int) ((ind < 2) ? 1 : 2*(ind - 2));
+			return (int) (2*ind);
+//		case 3:
+//			return Math.min((ind < 4) ? 1 : 2*(ind - 4), 14); 
+//		case 4:
+//			ind = (ind < 4) ? 0 : ind - 4;
+//			return Math.min(1 << ind, 14);
 		default:
 			return 1;
 		}
