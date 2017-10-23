@@ -147,6 +147,9 @@ public class BasicSettings {
       public int formula() {
     	  return config().getInt("tiny-lfu.count-min-4.formula");
       }
+      public int K() {
+    	  return config().getInt("tiny-lfu.count-min-4.K");
+      }
       public double countersMultiplier() {
         return config().getDouble("tiny-lfu.count-min-4.counters-multiplier");
       }

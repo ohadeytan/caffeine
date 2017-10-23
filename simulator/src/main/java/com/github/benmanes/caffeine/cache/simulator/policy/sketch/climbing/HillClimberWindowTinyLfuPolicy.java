@@ -68,8 +68,8 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
   private int sizeWindow;
   private int sizeProtected;
 
-  static final boolean debug = false;
-  static final boolean trace = false;
+  static final boolean debug = true;
+  static final boolean trace = true;
 
   public HillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
       HillClimberWindowTinyLfuSettings settings) {

@@ -6,6 +6,8 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
+import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
+import com.github.benmanes.caffeine.cache.simulator.BasicSettings.TinyLfuSettings.DoorkeeperSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.typesafe.config.Config;
 
@@ -17,6 +19,7 @@ public class Indicator {
 	private final EstSkew estSkew;
 	private final PeriodicResetCountMin4 sketch;
 	private long sample;
+	private int K;
 	
 	public Indicator(Config config) {
 		super();
@@ -24,13 +27,14 @@ public class Indicator {
 		this.estSkew = new EstSkew();
 		this.sketch = new PeriodicResetCountMin4(config);
 		this.sample = 0;
+	    BasicSettings settings = new BasicSettings(config);
+	    this.K = settings.tinyLfu().countMin4().K();
+
 	}
 
 	public void record(long key) {
 	    int hint = sketch.frequency(key);
-//	    if (hint > 0) {
-		    hinter.increment(hint);
-//	    }
+		hinter.increment(hint);
 	    sketch.increment(key);
 	    estSkew.record(key);
 	    sample++;
@@ -47,7 +51,7 @@ public class Indicator {
 	}
 	
 	public double getSkew() {
-		return estSkew.estSkew(50);
+		return estSkew.estSkew(K);
 	}
 	
 	public double getHint() {
@@ -56,7 +60,6 @@ public class Indicator {
 	
 	public double getIndicator() {
 		double skew = getSkew();
-//		return (getHint() - 1)*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/14.0;
 		return (getHint())*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)/15.0;
 	}
 	
