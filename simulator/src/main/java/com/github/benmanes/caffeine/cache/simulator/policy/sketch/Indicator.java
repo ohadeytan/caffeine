@@ -10,6 +10,7 @@ import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings.TinyLfuSettings.DoorkeeperSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -23,13 +24,16 @@ public class Indicator {
 	
 	public Indicator(Config config) {
 		super();
+		Config myConfig = ConfigFactory.parseString("maximum-size = 5000");
+		myConfig = myConfig.withFallback(config);
 		this.hinter = new Hinter();
 		this.estSkew = new EstSkew();
-		this.sketch = new PeriodicResetCountMin4(config);
+		this.sketch = new PeriodicResetCountMin4(myConfig);
 		this.sample = 0;
-	    BasicSettings settings = new BasicSettings(config);
+	    BasicSettings settings = new BasicSettings(myConfig);
 	    this.K = settings.tinyLfu().countMin4().K();
-
+	    
+	    
 	}
 
 	public void record(long key) {
@@ -94,7 +98,7 @@ public class Indicator {
 		}
 		
 		public double getAverage() {
-			return ((double) sum) / count;
+			return ((double) sum) / ((double) count);
 		}
 		
 		public int getSum() {
@@ -103,6 +107,10 @@ public class Indicator {
 		
 		public int getCount() {
 			return count;
+		}
+		
+		public int getMaximal() {
+			return freq[1];
 		}
 	}
 
@@ -160,6 +168,10 @@ public class Indicator {
 			entsum += (x) * Math.log(x);
 		}
 		return (long) (-entsum*1000);
+	}
+	
+	public long getMaximal() {
+		return hinter.getMaximal();
 	}
 
 }

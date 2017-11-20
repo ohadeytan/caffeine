@@ -21,10 +21,10 @@ public final class HintedClimber implements HillClimber {
 	private int cacheSize;
 	
 	public HintedClimber(Config config) {
-		this.indicator = new Indicator(config);
 	    HillClimberWindowTinyLfuSettings settings = new HillClimberWindowTinyLfuSettings(config);
 		this.prevPercent = 1 - settings.percentMain().get(0);
 		this.cacheSize = settings.maximumSize();
+		this.indicator = new Indicator(config);
 	}
 	
 	@Override
@@ -39,15 +39,23 @@ public final class HintedClimber implements HillClimber {
 
 	@Override
 	public Adaptation adapt(int windowSize, int protectedSize) {
-		if (indicator.getSample() == cacheSize*10) {
+//		if (indicator.getSample() == cacheSize*10) {
+		if (indicator.getSample() == 50000) {
 			double oldPercent = prevPercent;
 			double skew = indicator.getSkew();
-//			double newPercent = prevPercent = (indicator.getHint()*2*(skew < 1 ? 1 - Math.pow(skew, 3) : 0)) / 100.0;
-			double newPercent = prevPercent = indicator.getIndicator()*40 / 100.0;
+			double ind = indicator.getIndicator();
+			double newPercent;
+			if (ind < 0.2) {
+				newPercent = prevPercent = ind*80 / 100.0;
+			} else {
+				newPercent = prevPercent = ind*80 / 100.0;
+			}
 			sumHint += indicator.getHint();
 			sumSkew += Math.floor(skew*1000);
 			sumPercent += Math.floor(newPercent*100);
-			sumGini += indicator.getGini();
+			sumGini += indicator.getGini();		
+			sumIndicator += Math.floor(ind*1000);
+			sumMaximal += indicator.getMaximal();
 			periods++;
 			indicator.reset();
 			if (newPercent > oldPercent) {
@@ -62,6 +70,8 @@ public final class HintedClimber implements HillClimber {
 	long sumSkew;
 	long sumPercent;
 	long sumGini;
+	long sumIndicator;
+	long sumMaximal;
 	long periods;
 
 	public long getSumHint() {
@@ -76,17 +86,20 @@ public final class HintedClimber implements HillClimber {
 		return sumPercent;
 	}
 
+	public long getSumGini() {
+		return sumGini;
+	}
+
+	public long getSumIndicator() {
+		return sumIndicator;
+	}
+
 	public long getPeriods() {
 		return periods;
 	}
 
-	public Long getGini() {
-		return (long) indicator.getGini();
+	public Long getSumMaximal() {
+		return sumMaximal;
 	}
-
-	public Long getEntropy() {
-		return (long) indicator.getEntropy();
-	}
-
 	
 }

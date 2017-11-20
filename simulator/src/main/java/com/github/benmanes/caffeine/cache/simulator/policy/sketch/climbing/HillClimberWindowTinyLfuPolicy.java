@@ -68,8 +68,8 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
   private int sizeWindow;
   private int sizeProtected;
 
-  static final boolean debug = true;
-  static final boolean trace = true;
+  static final boolean debug = false;
+  static final boolean trace = false;
 
   public HillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
       HillClimberWindowTinyLfuSettings settings) {
@@ -282,8 +282,9 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
     	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumHint());
     	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumSkew());
     	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumPercent());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getGini());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getEntropy());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumGini());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumIndicator());
+    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumMaximal());
     	policyStats.getExtraInfo().add(((HintedClimber) climber).getPeriods());
    	}    	
     
