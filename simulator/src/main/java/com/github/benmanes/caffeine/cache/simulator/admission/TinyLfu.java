@@ -83,22 +83,22 @@ public final class TinyLfu implements Admittor {
 
     if (sketch instanceof AdaptiveResetCountMin4) {
         if (((AdaptiveResetCountMin4) sketch).getEventsToCount() == ((AdaptiveResetCountMin4) sketch).getPeriod()) {
-        	policyStats.getExtraInfo().add((long) ((AdaptiveResetCountMin4) sketch).getStep());
+        	policyStats.getExtraInfo().add((double) ((AdaptiveResetCountMin4) sketch).getStep());
         }    	
     }
 
     if (sketch instanceof HintedAdaptiveResetCountMin4) {
         if (((HintedAdaptiveResetCountMin4) sketch).getEventsToCount() == ((HintedAdaptiveResetCountMin4) sketch).getPeriod()) {
-        	policyStats.getExtraInfo().add((long) ((HintedAdaptiveResetCountMin4) sketch).getHintSum());
-        	policyStats.getExtraInfo().add((long) ((HintedAdaptiveResetCountMin4) sketch).getHintCount());
+        	policyStats.getExtraInfo().add((double) ((HintedAdaptiveResetCountMin4) sketch).getHintSum());
+        	policyStats.getExtraInfo().add((double) ((HintedAdaptiveResetCountMin4) sketch).getHintCount());
         }    	
     }
 
     if (sketch instanceof HintedResetCountMin4) {
         if (((HintedResetCountMin4) sketch).getEventsToCount() == ((HintedResetCountMin4) sketch).getPeriod()) {
-        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getHintSum());
-        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getHintCount());
-        	policyStats.getExtraInfo().add((long) ((HintedResetCountMin4) sketch).getMedianHint());
+        	policyStats.getExtraInfo().add((double) ((HintedResetCountMin4) sketch).getHintSum());
+        	policyStats.getExtraInfo().add((double) ((HintedResetCountMin4) sketch).getHintCount());
+        	policyStats.getExtraInfo().add((double) ((HintedResetCountMin4) sketch).getMedianHint());
         }    	
     }
 

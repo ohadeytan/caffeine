@@ -1,5 +1,7 @@
 package com.github.benmanes.caffeine.cache.simulator.policy.sketch;
 
+import com.clearspring.analytics.stream.Counter;
+import com.clearspring.analytics.stream.StreamSummary;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.stream.IntStream;
@@ -109,28 +111,33 @@ public class Indicator {
 			return count;
 		}
 		
-		public int getMaximal() {
-			return freq[1];
+		public int[] getFreq() {
+			return freq;
 		}
 	}
 
 	private static class EstSkew {
 		Long2IntMap freq;
+		StreamSummary<Long> stream;
 		public EstSkew() {
 			this.freq = new Long2IntOpenHashMap();
 			this.freq.defaultReturnValue(0);
+			this.stream = new StreamSummary<>(1000);
 		}
 		
 		public void record(long key) {
 			freq.put(key, freq.get(key) + 1);
+			stream.offer(key);
 		}
 		
 		public void reset() {
 			freq.clear();
+			this.stream = new StreamSummary<>(1000);
 		}
 		
 		public IntStream getTopK(int k) {
 			return freq.values().stream().sorted(Collections.reverseOrder()).mapToInt(i->i).limit(k);
+//			return stream.topK(k).stream().mapToInt(counter -> (int) counter.getCount());
 		}	
 		
 		public double estSkew(int k) {
@@ -142,6 +149,10 @@ public class Indicator {
 
 		public int[] getFreq() {
 			return freq.values().stream().sorted().mapToInt(i->i).toArray();
+		}
+
+		public int getUniques() {
+			return freq.size();
 		}
 	}
 
@@ -170,8 +181,12 @@ public class Indicator {
 		return (long) (-entsum*1000);
 	}
 	
-	public long getMaximal() {
-		return hinter.getMaximal();
+	public int[] getFreqs() {
+		return hinter.getFreq();
+	}
+
+	public int getUniques() {
+		return estSkew.getUniques();
 	}
 
 }

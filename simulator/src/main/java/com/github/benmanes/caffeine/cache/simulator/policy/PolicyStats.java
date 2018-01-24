@@ -39,10 +39,14 @@ public final class PolicyStats {
   private long rejectedCount;
   private long operationCount;
 
-  private List<Long> extraInfo = new ArrayList<>();
-  public List<Long> getExtraInfo() {
+  private List<Double> extraInfo = new ArrayList<>();
+  public List<Double> getExtraInfo() {
 	return extraInfo;
-}
+  }
+  public void setExtraInfo(List<Double> extraInfo) {
+	this.extraInfo = extraInfo;
+  }
+
 
 public PolicyStats(String name) {
     this.name = requireNonNull(name);

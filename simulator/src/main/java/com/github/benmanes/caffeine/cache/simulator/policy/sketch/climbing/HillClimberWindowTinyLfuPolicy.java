@@ -204,15 +204,18 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
 
   /** Performs the hill climbing process. */
   private void climb(long key, @Nullable QueueType queue) {
-    if (data.size() < maximumSize) {
-      return;
-    } else if (queue == null) {
+//    if (data.size() < maximumSize) {
+//      return;
+//    } else 
+   	if (queue == null) {
       climber.onMiss(key);
     } else {
       climber.onHit(key, queue);
     }
-
     Adaptation adaptation = climber.adapt(sizeWindow, sizeProtected);
+    if (data.size() < maximumSize) {
+        return;
+    }
     if (adaptation.type == INCREASE_WINDOW) {
       increaseWindow(adaptation.amount);
     } else if (adaptation.type == DECREASE_WINDOW) {
@@ -279,13 +282,7 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
     printSegmentSizes();
 
     if (climber instanceof HintedClimber) {
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumHint());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumSkew());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumPercent());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumGini());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumIndicator());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getSumMaximal());
-    	policyStats.getExtraInfo().add(((HintedClimber) climber).getPeriods());
+    	policyStats.setExtraInfo(((HintedClimber) climber).getExtraInfo());
    	}    	
     
     long windowSize = data.values().stream().filter(n -> n.queue == WINDOW).count();
