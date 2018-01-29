@@ -168,6 +168,7 @@ public final class AdaptiveFrdPolicy implements Policy {
   private void adaptFilterToMain(Node node) {
 	// Cache miss and history hit with adaptation: Evict from filter stack. Than, insert to main stack.
 	policyStats.recordEviction();
+	policyStats.recordMiss();
 
     Node victim = headFilter.prevFilter; 
     victim.removeFrom(StackType.FILTER); 
