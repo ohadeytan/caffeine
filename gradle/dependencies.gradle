@@ -50,7 +50,7 @@ ext {
     junit: '4.12',
     mockito: '2.19.0',
     paxExam: '4.11.0',
-    testng: '6.14.3',
+    testng: '6.12',
     truth: '0.24',
   ]
   benchmarkVersions = [
@@ -63,7 +63,7 @@ ext {
     jackrabbit: '1.9.4',
     jamm: '0.3.2',
     javaObjectLayout: '0.9',
-    jmh: '1.21',
+    jmh: 1.20,
     koloboke: '0.6.8',
     ohc: '0.6.1',
     slf4j: '1.7.25',

@@ -59,8 +59,8 @@ dependencies {
 }
 
 compileCodeGenJava {
-  gradle.taskGraph.whenReady {
-    enabled = gradle.taskGraph.hasTask('uploadArchives')
+  outputs.upToDateWhen {
+    !gradle.taskGraph.hasTask('uploadArchives')
   }
   dependsOn compileJava
   destinationDir = compileJava.destinationDir
