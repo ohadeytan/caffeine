@@ -32,6 +32,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.ArcIndicator
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.ArcPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.CarPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.adaptive.CartPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.irr.AdaptiveFrdPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.irr.ClockProPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.irr.FrdPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.irr.LirsPolicy;
@@ -155,6 +156,8 @@ public final class Registry {
   }
 
   private static void registerIrr(Map<String, Function<Config, Set<Policy>>> factories) {
+	  
+    factories.put("irr.AdaptiveFrd", AdaptiveFrdPolicy::policies);
     factories.put("irr.Frd", FrdPolicy::policies);
     factories.put("irr.Lirs", LirsPolicy::policies);
     factories.put("irr.ClockPro", ClockProPolicy::policies);
