@@ -140,12 +140,12 @@ public final class AdaptiveFrdPolicy implements Policy {
       residentSize++;
       residentFilter++;
     } else if (residentFilter < maximumFilterSize) {
-    	checkState(residentMain > maximumMainResidentSize);
+//    	checkState(residentMain > maximumMainResidentSize);
     	adaptMainToFilter(node);
     } else { 
       onFullMiss(node);
     }
-    checkState(residentSize < maximumSize || residentFilter + residentMain == maximumSize);
+//  checkState(residentSize < maximumSize || residentFilter + residentMain == maximumSize);
   }
   
   private void adaptMainToFilter(Node node) {

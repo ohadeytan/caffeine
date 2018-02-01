@@ -126,7 +126,7 @@ public class Indicator {
 		}
 		
 		public void record(long key) {
-			freq.put(key, freq.get(key) + 1);
+//			freq.put(key, freq.get(key) + 1);
 			stream.offer(key);
 		}
 		
@@ -136,8 +136,8 @@ public class Indicator {
 		}
 		
 		public IntStream getTopK(int k) {
-			return freq.values().stream().sorted(Collections.reverseOrder()).mapToInt(i->i).limit(k);
-//			return stream.topK(k).stream().mapToInt(counter -> (int) counter.getCount());
+//			return freq.values().stream().sorted(Collections.reverseOrder()).mapToInt(i->i).limit(k);
+			return stream.topK(k).stream().mapToInt(counter -> (int) counter.getCount());
 		}	
 		
 		public double estSkew(int k) {
