@@ -138,7 +138,7 @@ public final class HillClimberFrdPolicy implements Policy {
 		  maximumFilterSize = maximumSize - 1;	
 		}
 		maximumMainResidentSize = maximumSize - maximumFilterSize;
-		System.out.println(maximumFilterSize);
+		// System.out.println(maximumFilterSize);
       }
       previousHitRate = hitRate;
 

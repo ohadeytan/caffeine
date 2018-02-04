@@ -53,7 +53,7 @@ public final class FrdPolicy implements Policy {
   final Node headFilter;
   final Node headMain;
 
-  final int maximumMainResidentSize;
+  int maximumMainResidentSize;
   final int maximumFilterSize;
   final int maximumSize;
 
@@ -61,11 +61,17 @@ public final class FrdPolicy implements Policy {
 
   public FrdPolicy(Config config) {
     FrdSettings settings = new FrdSettings(config);
+    this.maximumSize = settings.maximumSize();
     this.maximumMainResidentSize = (int) (settings.maximumSize() * settings.percentMain());
+	if (maximumMainResidentSize <= 0) {
+	  maximumMainResidentSize = 1;
+	}
+	if (maximumMainResidentSize >= maximumSize) {
+	  maximumMainResidentSize = maximumSize - 1;	
+	}
     this.maximumFilterSize = settings.maximumSize() - maximumMainResidentSize;
     this.policyStats = new PolicyStats("irr.Frd");
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSize();
     this.headFilter = new Node();
     this.headMain = new Node();
   }
