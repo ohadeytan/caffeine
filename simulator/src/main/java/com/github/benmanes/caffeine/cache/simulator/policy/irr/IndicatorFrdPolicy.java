@@ -51,7 +51,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public final class AdaptiveFrdPolicy implements Policy {
+public final class IndicatorFrdPolicy implements Policy {
   final Long2ObjectOpenHashMap<Node> data;
   final PolicyStats policyStats;
   final Indicator indicator;
@@ -66,7 +66,7 @@ public final class AdaptiveFrdPolicy implements Policy {
   int residentFilter;
   int residentMain;
 
-  public AdaptiveFrdPolicy(Config config) {
+  public IndicatorFrdPolicy(Config config) {
     FrdSettings settings = new FrdSettings(config);
     this.maximumMainResidentSize = (int) (settings.maximumSize() * settings.percentMain());
     this.maximumFilterSize = settings.maximumSize() - maximumMainResidentSize;
@@ -80,7 +80,7 @@ public final class AdaptiveFrdPolicy implements Policy {
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    return ImmutableSet.of(new AdaptiveFrdPolicy(config));
+    return ImmutableSet.of(new IndicatorFrdPolicy(config));
   }
 
   @Override
