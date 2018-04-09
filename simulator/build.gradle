@@ -29,6 +29,8 @@ dependencies {
   compile group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
   compile 'com.clearspring.analytics:stream:2.9.5'
 
+  compile group: 'org.jpmml', name: 'pmml-evaluator', version: '1.4.0'
+  compile group: 'org.jpmml', name: 'pmml-evaluator-extension', version: '1.4.0'
 }
 
 test {

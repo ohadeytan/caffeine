@@ -126,7 +126,7 @@ public class Indicator {
 		}
 		
 		public void record(long key) {
-//			freq.put(key, freq.get(key) + 1);
+			freq.put(key, freq.get(key) + 1);
 			stream.offer(key);
 		}
 		
