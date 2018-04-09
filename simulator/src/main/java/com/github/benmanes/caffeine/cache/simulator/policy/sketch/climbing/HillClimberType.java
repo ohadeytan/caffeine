@@ -31,6 +31,7 @@ enum HillClimberType {
   SIMPLE(SimpleClimber::new),
   SIMULATED_ANNEALING(SimulatedAnnealingClimber::new),
   HINTED(HintedClimber::new),
+  FEATURES(ExtractFeaturesClimber::new),
   MLTREE(MLTreeClimber::new);
 	
 

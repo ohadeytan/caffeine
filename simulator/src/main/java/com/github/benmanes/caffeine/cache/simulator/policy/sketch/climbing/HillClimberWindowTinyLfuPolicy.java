@@ -280,9 +280,8 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
   @Override
   public void finished() {
     printSegmentSizes();
-
-    if (climber instanceof HintedClimber) {
-    	policyStats.setExtraInfo(((HintedClimber) climber).getExtraInfo());
+    if (climber instanceof ExtractFeaturesClimber) {
+    	policyStats.setExtraInfo(((ExtractFeaturesClimber) climber).getExtraInfo());
    	}    	
     
     long windowSize = data.values().stream().filter(n -> n.queue == WINDOW).count();
