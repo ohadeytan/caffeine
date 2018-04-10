@@ -44,6 +44,7 @@ public final class ExtractFeaturesClimber implements HillClimber {
 		if (indicator.getSample() == 50000) {
 			if (firstPeriod) { // For warm up
 				firstPeriod = false;
+				indicator.reset();
 				return new Adaptation(Adaptation.Type.HOLD, 0);
 			}
 			features.incMultiplier();
