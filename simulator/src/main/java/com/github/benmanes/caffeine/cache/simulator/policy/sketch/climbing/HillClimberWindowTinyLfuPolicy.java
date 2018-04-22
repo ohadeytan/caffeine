@@ -371,5 +371,8 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
           .map(HillClimberType::valueOf)
           .collect(toSet());
     }
+    public String model() {
+    	return config().getString("hill-climber-window-tiny-lfu.model");
+    }
   }
 }

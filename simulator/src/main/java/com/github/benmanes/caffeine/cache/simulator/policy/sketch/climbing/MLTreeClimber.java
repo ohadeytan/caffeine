@@ -47,7 +47,7 @@ public final class MLTreeClimber implements HillClimber {
 		InputStream is;
 		PMML pmml = null;
 		try {
-			is = new FileInputStream("/home/ohad/Documents/Technion/Courses/Current/Research/MachineLearningBalance/Model.pmml");
+			is = new FileInputStream(settings.model());
 			pmml = org.jpmml.model.PMMLUtil.unmarshal(is);
 		} catch (SAXException | JAXBException | FileNotFoundException e) {
 			e.printStackTrace();
