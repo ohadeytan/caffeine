@@ -33,9 +33,6 @@ import com.typesafe.config.Config;
 public final class MLTreeClimber implements HillClimber {
 
 	private final Indicator indicator;
-//	private final double[] hintToPercent = {0, 0, 1, 2, 4, 8, 16, 32, 68, 84, 92, 96, 98, 99, 100, 100};
-//	private final double[] hintToPercent = {0, 1, 1, 1, 1, 2, 4, 8, 16, 32, 68, 84, 92, 96, 98, 99};
-//	private final double[] hintToPercent = {0, 1, 1, 1, 1, 2, 3, 5, 7, 10, 12, 15, 17, 20, 25, 30};
 	private double prevPercent;
 	private int cacheSize;
 	private Evaluator evaluator;
@@ -98,8 +95,17 @@ public final class MLTreeClimber implements HillClimber {
 //				System.out.println(inputFieldName);
 //				System.out.println(inputFieldValue);
 			}
+			Object targetValue = evaluator.evaluate(arguments).get(new FieldName("Target"));
 			
-			double newPercent = prevPercent = (double) (((Computable) evaluator.evaluate(arguments).get(new FieldName("Target"))).getResult()) / 100.0;
+			double newPercent;
+			if (targetValue instanceof Computable) {
+				newPercent = (double) ((Computable) targetValue).getResult() / 100.0;
+			} else {
+				newPercent = (double) targetValue / 100.0;
+			}
+            newPercent = newPercent < 0 ? 0 : newPercent;
+            newPercent = newPercent > 0.8 ? 0.8 : newPercent;
+            prevPercent = newPercent;
 			System.out.println(newPercent);
 //			System.out.println("============!");
 			
