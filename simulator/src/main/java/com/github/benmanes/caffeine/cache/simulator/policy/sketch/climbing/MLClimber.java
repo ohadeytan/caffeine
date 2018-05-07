@@ -30,7 +30,7 @@ import com.typesafe.config.Config;
  * @author ohad
  *
  */
-public final class MLTreeClimber implements HillClimber {
+public final class MLClimber implements HillClimber {
 
 	private final Indicator indicator;
 	private double prevPercent;
@@ -38,7 +38,7 @@ public final class MLTreeClimber implements HillClimber {
 	private Evaluator evaluator;
 	Map<String, Float> features_map;
 	
-	public MLTreeClimber(Config config) {
+	public MLClimber(Config config) {
 	    HillClimberWindowTinyLfuSettings settings = new HillClimberWindowTinyLfuSettings(config);
 		this.prevPercent = 1 - settings.percentMain().get(0);
 		this.cacheSize = settings.maximumSize();
@@ -96,7 +96,7 @@ public final class MLTreeClimber implements HillClimber {
 //				System.out.println(inputFieldValue);
 			}
 			Object targetValue = evaluator.evaluate(arguments).get(new FieldName("Target"));
-			
+
 			double newPercent;
 			if (targetValue instanceof Computable) {
 				newPercent = (double) ((Computable) targetValue).getResult() / 100.0;

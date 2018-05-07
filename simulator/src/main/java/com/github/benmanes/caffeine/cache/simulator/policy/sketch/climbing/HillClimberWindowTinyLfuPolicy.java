@@ -69,7 +69,7 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
   private int sizeProtected;
 
   static final boolean debug = false;
-  static final boolean trace = false;
+  static final boolean trace = true;
 
   public HillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
       HillClimberWindowTinyLfuSettings settings) {
@@ -204,9 +204,9 @@ public final class HillClimberWindowTinyLfuPolicy implements Policy {
 
   /** Performs the hill climbing process. */
   private void climb(long key, @Nullable QueueType queue) {
-//    if (data.size() < maximumSize) {
-//      return;
-//    } else 
+    if (data.size() < maximumSize) {
+      return;
+    } else 
    	if (queue == null) {
       climber.onMiss(key);
     } else {
