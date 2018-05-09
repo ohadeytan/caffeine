@@ -32,7 +32,8 @@ enum HillClimberType {
   SIMULATED_ANNEALING(SimulatedAnnealingClimber::new),
   HINTED(HintedClimber::new),
   FEATURES(ExtractFeaturesClimber::new),
-  ML(MLClimber::new);
+  ML(MLClimber::new),
+  MINISIM(MiniSimClimber::new);
 	
 
   private final Function<Config, HillClimber> factory;

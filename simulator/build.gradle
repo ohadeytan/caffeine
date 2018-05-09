@@ -31,6 +31,8 @@ dependencies {
 
   compile group: 'org.jpmml', name: 'pmml-evaluator', version: '1.4.0'
   compile group: 'org.jpmml', name: 'pmml-evaluator-extension', version: '1.4.0'
+  
+  compile group: 'com.sangupta', name: 'murmur', version: '1.0.0'
 }
 
 test {

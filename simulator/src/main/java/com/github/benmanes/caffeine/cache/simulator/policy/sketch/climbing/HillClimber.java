@@ -25,6 +25,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public interface HillClimber {
 
+  default void doAlways(long key) {
+  }
+
+	
   /**
    * Records that a hit occurred.
    *
