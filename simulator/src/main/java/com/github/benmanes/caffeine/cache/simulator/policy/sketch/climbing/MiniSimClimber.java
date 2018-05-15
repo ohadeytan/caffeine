@@ -49,9 +49,9 @@ public final class MiniSimClimber implements HillClimber {
 
 	@Override
 	public void doAlways(long key) {
+		sample++;
 		String skey = String.valueOf(key);
 		if (Murmur3.hash_x86_32(skey.getBytes(), skey.length(), 0x7f3a2142) % R < 1) {
-			sample++;
 			for (int i = 0; i < minis.length; i++) {
 				minis[i].record(key);
 			}
@@ -70,7 +70,7 @@ public final class MiniSimClimber implements HillClimber {
 
 	@Override
 	public Adaptation adapt(int windowSize, int protectedSize) {		
-		if (sample > 1000) {
+		if (sample > 1000000) {
 			long periodMisses[] = new long[101];
 			for (int i = 0; i < minis.length; i++) {
 				periodMisses[i] = minis[i].stats().missCount() - prevMisses[i];
@@ -83,7 +83,7 @@ public final class MiniSimClimber implements HillClimber {
 				}
 			}
 			
-			System.out.println("Minimal index is " + minIndex + " with " + periodMisses[minIndex]*R + " est misses, while current " + misses);
+//			System.out.println("Minimal index is " + minIndex + " with " + periodMisses[minIndex]*R + " est misses, while current " + misses);
 
 			double oldPercent = prevPercent;
 			double newPercent = prevPercent = minIndex < 80 ? minIndex/100.0 : 0.8;

@@ -120,18 +120,18 @@ public class Indicator {
 		Long2IntMap freq;
 		StreamSummary<Long> stream;
 		public EstSkew() {
-			this.freq = new Long2IntOpenHashMap();
-			this.freq.defaultReturnValue(0);
+//			this.freq = new Long2IntOpenHashMap();
+//			this.freq.defaultReturnValue(0);
 			this.stream = new StreamSummary<>(1000);
 		}
 		
 		public void record(long key) {
-			freq.put(key, freq.get(key) + 1);
+//			freq.put(key, freq.get(key) + 1);
 			stream.offer(key);
 		}
 		
 		public void reset() {
-			freq.clear();
+//			freq.clear();
 			this.stream = new StreamSummary<>(1000);
 		}
 		
