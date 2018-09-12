@@ -25,6 +25,7 @@ import com.github.benmanes.caffeine.cache.simulator.parser.corda.CordaTraceReade
 import com.github.benmanes.caffeine.cache.simulator.parser.gradle.GradleTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.lirs.LirsTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.msr.MsrTraceReader;
+import com.github.benmanes.caffeine.cache.simulator.parser.systor.SystorTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.scarab.ScarabTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.umass.network.YoutubeTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.umass.storage.StorageTraceReader;
@@ -47,7 +48,8 @@ public enum TraceFormat {
   CACHE2K(Cache2kTraceReader::new),
   SCARAB(ScarabTraceReader::new),
   MSR(MsrTraceReader::new),
-  CORDA(CordaTraceReader::new);
+  CORDA(CordaTraceReader::new),
+  SYSTOR(SystorTraceReader::new);
 
   private final Function<List<String>, TraceReader> factory;
 
