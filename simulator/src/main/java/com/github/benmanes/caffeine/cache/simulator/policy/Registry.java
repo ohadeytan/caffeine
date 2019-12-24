@@ -54,6 +54,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.product.GuavaPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.OhcPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.TCachePolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sampled.SampledPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.SizedWindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberWindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.feedback.FeedbackTinyLfuPolicy;
@@ -144,6 +145,7 @@ public final class Registry {
 
   private static void registerSketch(Map<String, Function<Config, Set<Policy>>> factories) {
     factories.put("sketch.WindowTinyLfu", WindowTinyLfuPolicy::policies);
+    factories.put("sketch.SizedWindowTinyLfu", SizedWindowTinyLfuPolicy::policies);
     factories.put("sketch.S4WindowTinyLfu", S4WindowTinyLfuPolicy::policies);
     factories.put("sketch.LruWindowTinyLfu", LruWindowTinyLfuPolicy::policies);
     factories.put("sketch.RandomWindowtinyLfu", RandomWindowTinyLfuPolicy::policies);
