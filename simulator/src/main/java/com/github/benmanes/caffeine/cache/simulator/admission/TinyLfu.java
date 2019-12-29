@@ -89,4 +89,9 @@ public final class TinyLfu implements Admittor {
     policyStats.recordRejection();
     return false;
   }
+  
+  @Override
+  public void ensureCapacity(long sizemaximumSize) {
+    sketch.ensureCapacity(sizemaximumSize);
+  }
 }

@@ -27,8 +27,6 @@ import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
-import com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic;
-import com.github.benmanes.caffeine.cache.simulator.policy.Policy.KeyOnlyPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Sets;
@@ -69,6 +67,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   private int sizeWindow;
   private int sizeProtected;
+  private int sizeData;
 
   public SizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
     String name = String.format("sketch.SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
@@ -109,7 +108,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     policyStats.recordOperation();
     Node node = data.get(key);
     if (node == null) {
-      onMiss(key);
+      onMiss(key, weight);
       policyStats.recordWeightedMiss(weight);
     } else if (node.status == Status.WINDOW) {
       onWindowHit(node);
@@ -126,13 +125,17 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   }
 
   /** Adds the entry to the admission window, evicting if necessary. */
-  private void onMiss(long key) {
+  private void onMiss(long key, int weight) {
+    if (sizeData >= (maximumSize >>> 1)) {
+      admittor.ensureCapacity(data.size());
+    }
     admittor.record(key);
 
-    Node node = new Node(key, Status.WINDOW);
+    Node node = new Node(key, weight, Status.WINDOW);
     node.appendToTail(headWindow);
     data.put(key, node);
-    sizeWindow++;
+    sizeWindow += weight;
+    sizeData += weight;
     evict();
   }
 
@@ -150,13 +153,13 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     node.status = Status.PROTECTED;
     node.appendToTail(headProtected);
 
-    sizeProtected++;
-    if (sizeProtected > maxProtected) {
+    sizeProtected += node.weight;
+    while (sizeProtected > maxProtected) {
       Node demote = headProtected.next;
       demote.remove();
       demote.status = Status.PROBATION;
       demote.appendToTail(headProbation);
-      sizeProtected--;
+      sizeProtected -= demote.weight;
     }
   }
 
@@ -171,38 +174,63 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
    * then the admission candidate and probation's victim are evaluated and one is evicted.
    */
   private void evict() {
-    if (sizeWindow <= maxWindow) {
-      return;
+    final Node headCandidates = new Node();
+    while (sizeWindow > maxWindow) {
+      Node candidate = headWindow.next;
+      sizeWindow -= candidate.weight;
+      sizeData -= candidate.weight;
+      candidate.remove();
+      candidate.appendToTail(headCandidates);
     }
-
-    Node candidate = headWindow.next;
-    sizeWindow--;
-
-    candidate.remove();
-    candidate.status = Status.PROBATION;
-    candidate.appendToTail(headProbation);
-
-    if (data.size() > maximumSize) {
-      Node victim = headProbation.next;
-      Node evict = admittor.admit(candidate.key, victim.key) ? victim : candidate;
-      data.remove(evict.key);
-      evict.remove();
-
-      policyStats.recordEviction();
+    while (headCandidates.prev != headCandidates) {
+      Node candidate = headCandidates.prev;
+      candidate.status = Status.PROBATION;
+      candidate.remove();
+      if ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
+        Node victim = getVictim();
+        if (admittor.admit(candidate.key, victim.key)) {
+          sizeData += candidate.weight;
+          while (sizeData > maximumSize) {
+            Node evict = getVictim();
+            data.remove(evict.key);
+            sizeData -= evict.weight;
+            if (evict.status == Status.PROTECTED) {
+              sizeProtected -= evict.weight;
+            }
+            evict.remove();
+            policyStats.recordEviction();
+          }
+          candidate.appendToTail(headProbation);
+        } else {
+          data.remove(candidate.key);
+          policyStats.recordEviction();
+        }
+      } else {
+        candidate.appendToTail(headProbation);
+        sizeData += candidate.weight;
+      }
     }
   }
+  
+  private Node getVictim() {
+    if (headProbation.next != headProbation) {
+      return headProbation.next;
+    }
+    return headProtected.next;
+  }
+
 
   @Override
   public void finished() {
-    long windowSize = data.values().stream().filter(n -> n.status == Status.WINDOW).count();
-    long probationSize = data.values().stream().filter(n -> n.status == Status.PROBATION).count();
-    long protectedSize = data.values().stream().filter(n -> n.status == Status.PROTECTED).count();
+    long windowSize = data.values().stream().filter(n -> n.status == Status.WINDOW).mapToInt(node -> node.weight).sum();
+    long probationSize = data.values().stream().filter(n -> n.status == Status.PROBATION).mapToInt(node -> node.weight).sum();
+    long protectedSize = data.values().stream().filter(n -> n.status == Status.PROTECTED).mapToInt(node -> node.weight).sum();
 
-    checkState(windowSize == sizeWindow);
-    checkState(protectedSize == sizeProtected);
-    checkState(probationSize == data.size() - windowSize - protectedSize);
+    checkState(windowSize <= sizeWindow);
+    checkState(protectedSize <= sizeProtected);
+    checkState(probationSize <= sizeData - windowSize - protectedSize);
 
-    checkState(data.size() <= maximumSize);
+    checkState(sizeData <= maximumSize);
   }
 
   enum Status {
@@ -212,6 +240,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   /** A node on the double-linked list. */
   static final class Node {
     final long key;
+    final int weight;
 
     Status status;
     Node prev;
@@ -220,14 +249,16 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     /** Creates a new sentinel node. */
     public Node() {
       this.key = Integer.MIN_VALUE;
+      this.weight = 0;
       this.prev = this;
       this.next = this;
     }
 
     /** Creates a new, unlinked node. */
-    public Node(long key, Status status) {
+    public Node(long key, int weight, Status status) {
       this.status = status;
       this.key = key;
+      this.weight = weight;
     }
 
     public void moveToTail(Node head) {
@@ -255,6 +286,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     public String toString() {
       return MoreObjects.toStringHelper(this)
           .add("key", key)
+          .add("weight", weight)
           .add("status", status)
           .toString();
     }

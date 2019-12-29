@@ -37,6 +37,9 @@ public interface Admittor {
    * @return if the candidate should be added and the victim removed due to eviction
    */
   boolean admit(long candidateKey, long victimKey);
+  
+  /** Increases the capacity of this Admittor instance, if necessary. */
+  default void ensureCapacity(long sizemaximumSize) {}
 
   /** Returns an admittor that admits every candidate. */
   static Admittor always() {
