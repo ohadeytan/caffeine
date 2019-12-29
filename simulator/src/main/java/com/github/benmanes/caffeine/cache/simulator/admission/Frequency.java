@@ -30,4 +30,8 @@ public interface Frequency {
 
   /** Feedback to allow for adaptability. */
   default void reportMiss() {}
+  
+  /** Increases the capacity of this multiset instance, if necessary. */
+  default void ensureCapacity(long sizemaximumSize) {}
+  
 }

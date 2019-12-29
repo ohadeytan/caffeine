@@ -49,9 +49,10 @@ public abstract class CountMin4 implements Frequency {
     conservative = settings.tinyLfu().conservative();
 
     double countersMultiplier = settings.tinyLfu().countMin4().countersMultiplier();
-    long counters = (long) (countersMultiplier * settings.maximumSize());
-    ensureCapacity(counters);
-
+    if (!settings.tinyLfu().lazy()) {
+      long counters = (long) (countersMultiplier * settings.maximumSize());
+      ensureCapacity(counters);
+    }
   }
 
   /**
@@ -61,7 +62,8 @@ public abstract class CountMin4 implements Frequency {
    *
    * @param maximumSize the maximum size of the cache
    */
-  protected void ensureCapacity(long maximumSize) {
+  @Override
+  public void ensureCapacity(long maximumSize) {
     checkArgument(maximumSize >= 0);
     int maximum = (int) Math.min(maximumSize, Integer.MAX_VALUE >>> 1);
     if ((table != null) && (table.length >= maximum)) {
@@ -80,6 +82,9 @@ public abstract class CountMin4 implements Frequency {
    */
   @Override
   public int frequency(long e) {
+    if (table == null) {
+      return 0;
+    }
     int hash = spread(Long.hashCode(e));
     int start = (hash & 3) << 2;
     int frequency = Integer.MAX_VALUE;
@@ -100,6 +105,9 @@ public abstract class CountMin4 implements Frequency {
    */
   @Override
   public void increment(long e) {
+    if (table == null) {
+      return;
+    }
     if (conservative) {
       conservativeIncrement(e);
     } else {

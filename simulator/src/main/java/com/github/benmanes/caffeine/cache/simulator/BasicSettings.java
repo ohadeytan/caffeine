@@ -125,6 +125,9 @@ public class BasicSettings {
     public boolean conservative() {
       return config().getBoolean("tiny-lfu.count-min.conservative");
     }
+    public boolean lazy() {
+      return config().getBoolean("tiny-lfu.count-min.lazy");
+    }
     public CountMin4Settings countMin4() {
       return new CountMin4Settings();
     }

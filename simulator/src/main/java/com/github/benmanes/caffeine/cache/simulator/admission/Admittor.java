@@ -56,6 +56,9 @@ public interface Admittor {
   default boolean admit(long candidateKey, long victimKey) {
     return admit(AccessEvent.forKey(candidateKey), AccessEvent.forKey(victimKey));
   }
+  
+  /** Increases the capacity of this Admittor instance, if necessary. */
+  default void ensureCapacity(long sizemaximumSize) {}
 
   /** Returns an admittor that admits every candidate. */
   static Admittor always() {

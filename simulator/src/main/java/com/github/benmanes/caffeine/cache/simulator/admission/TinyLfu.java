@@ -90,4 +90,9 @@ public final class TinyLfu implements KeyOnlyAdmittor {
     policyStats.recordRejection();
     return false;
   }
+  
+  @Override
+  public void ensureCapacity(long sizemaximumSize) {
+    sketch.ensureCapacity(sizemaximumSize);
+  }
 }
