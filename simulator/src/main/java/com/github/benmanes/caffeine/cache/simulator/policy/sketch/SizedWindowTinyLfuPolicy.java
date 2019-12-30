@@ -25,7 +25,9 @@ import java.util.Set;
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
+import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
+import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
@@ -56,7 +58,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 public final class SizedWindowTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
   private final PolicyStats policyStats;
-  private final Admittor admittor;
+  private final Frequency sketch;
   private final int maximumSize;
   private final Version version;
   
@@ -75,7 +77,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     String name = String.format("sketch.SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
-    this.admittor = new TinyLfu(settings.config(), policyStats);
+    this.sketch = new PeriodicResetCountMin4(settings.config());
     this.version = settings.version();
     
     int maxMain = (int) (settings.maximumSize() * percentMain);
@@ -131,9 +133,9 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   /** Adds the entry to the admission window, evicting if necessary. */
   private void onMiss(long key, int weight) {
     if (sizeData >= (maximumSize >>> 1)) {
-      admittor.ensureCapacity(data.size());
+      sketch.ensureCapacity(data.size());
     }
-    admittor.record(key);
+    sketch.increment(key);
 
     Node node = new Node(key, weight, Status.WINDOW);
     node.appendToTail(headWindow);
@@ -145,13 +147,13 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   /** Moves the entry to the MRU position in the admission window. */
   private void onWindowHit(Node node) {
-    admittor.record(node.key);
+    sketch.increment(node.key);
     node.moveToTail(headWindow);
   }
 
   /** Promotes the entry to the protected region's MRU position, demoting an entry if necessary. */
   private void onProbationHit(Node node) {
-    admittor.record(node.key);
+    sketch.increment(node.key);
 
     node.remove();
     node.status = Status.PROTECTED;
@@ -169,7 +171,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   /** Moves the entry to the MRU position, if it falls outside of the fast-path threshold. */
   private void onProtectedHit(Node node) {
-    admittor.record(node.key);
+    sketch.increment(node.key);
     node.moveToTail(headProtected);
   }
 
@@ -192,7 +194,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
       candidate.remove();
       if ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
         Node victim = getVictim();
-        if (admittor.admit(candidate.key, victim.key)) {
+        if (admit(candidate.key, victim.key)) {
           sizeData += candidate.weight;
           while (sizeData > maximumSize) {
             Node evict = getVictim();
@@ -216,6 +218,19 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
   
+  private boolean admit(long candidate, long victim) {
+    sketch.reportMiss();
+
+    long candidateFreq = sketch.frequency(candidate);
+    long victimFreq = sketch.frequency(victim);
+    if (candidateFreq > victimFreq) {
+      policyStats.recordAdmission();
+      return true;
+    }
+    policyStats.recordRejection();
+    return false;
+  }
+
   private Node getVictim() {
     if (headProbation.next != headProbation) {
       return headProbation.next;
