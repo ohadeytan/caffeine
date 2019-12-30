@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
@@ -57,7 +58,8 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   private final PolicyStats policyStats;
   private final Admittor admittor;
   private final int maximumSize;
-
+  private final Version version;
+  
   private final Node headWindow;
   private final Node headProbation;
   private final Node headProtected;
@@ -68,12 +70,14 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   private int sizeWindow;
   private int sizeProtected;
   private int sizeData;
+  
 
-  public SizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
+  public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     String name = String.format("sketch.SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
     this.admittor = new TinyLfu(settings.config(), policyStats);
-
+    this.version = settings.version();
+    
     int maxMain = (int) (settings.maximumSize() * percentMain);
     this.maxProtected = (int) (maxMain * settings.percentMainProtected());
     this.maxWindow = settings.maximumSize() - maxMain;
@@ -86,7 +90,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
+    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
     return settings.percentMain().stream()
         .map(percentMain -> new SizedWindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
@@ -292,15 +296,16 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
 
-  public static final class WindowTinyLfuSettings extends BasicSettings {
-    public WindowTinyLfuSettings(Config config) {
+  static enum Version {
+    SIMPLE,
+  }
+  
+  public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
+    public SizedWindowTinyLfuSettings(Config config) {
       super(config);
     }
-    public List<Double> percentMain() {
-      return config().getDoubleList("window-tiny-lfu.percent-main");
-    }
-    public double percentMainProtected() {
-      return config().getDouble("window-tiny-lfu.percent-main-protected");
+    public Version version() {
+      return Version.valueOf(config().getString("sized-window-tiny-lfu.version").toUpperCase());
     }
   }
 }
