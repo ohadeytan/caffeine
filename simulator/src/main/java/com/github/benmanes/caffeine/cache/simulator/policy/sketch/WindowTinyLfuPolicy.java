@@ -252,7 +252,7 @@ public final class WindowTinyLfuPolicy implements KeyOnlyPolicy {
     }
   }
 
-  public static final class WindowTinyLfuSettings extends BasicSettings {
+  public static class WindowTinyLfuSettings extends BasicSettings {
     public WindowTinyLfuSettings(Config config) {
       super(config);
     }

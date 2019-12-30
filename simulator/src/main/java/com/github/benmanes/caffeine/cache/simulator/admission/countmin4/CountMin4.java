@@ -48,8 +48,8 @@ public abstract class CountMin4 implements Frequency {
     BasicSettings settings = new BasicSettings(config);
     conservative = settings.tinyLfu().conservative();
 
-    double countersMultiplier = settings.tinyLfu().countMin4().countersMultiplier();
     if (!settings.tinyLfu().lazy()) {
+      double countersMultiplier = settings.tinyLfu().countMin4().countersMultiplier();
       long counters = (long) (countersMultiplier * settings.maximumSize());
       ensureCapacity(counters);
     }
