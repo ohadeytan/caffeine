@@ -22,7 +22,10 @@ import static java.util.stream.Collectors.toSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.SizedWindowTinyLfuPolicy.Node;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
@@ -75,10 +78,11 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
   
 
   public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
-    String name = String.format("sketch.SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+    this.version = settings.version();
+    String name = String.format("sketch." + StringUtils.capitalize(version.name().toLowerCase()) + 
+        "SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
     this.sketch = new PeriodicResetCountMin4(settings.config());
-    this.version = settings.version();
     
     int maxMain = (int) (settings.maximumSize() * percentMain);
     this.maxProtected = (int) (maxMain * settings.percentMainProtected());
@@ -137,8 +141,16 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
     sketch.increment(key);
 
+    if (weight > (maximumSize - maxWindow)) {
+      policyStats.recordRejection();
+      return;
+    }
     Node node = new Node(key, weight, Status.WINDOW);
-    node.appendToTail(headWindow);
+    if (weight > maxWindow) {
+      node.appendNextToHead(headWindow);  
+    } else {
+      node.appendToTail(headWindow);
+    }
     data.put(key, node);
     sizeWindow += weight;
     sizeData += weight;
@@ -194,7 +206,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
       candidate.remove();
       if ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
         Node victim = getVictim();
-        if (admit(candidate.key, victim.key)) {
+        if (admit(candidate, victim)) {
           sizeData += candidate.weight;
           while (sizeData > maximumSize) {
             Node evict = getVictim();
@@ -218,14 +230,24 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
   
-  private boolean admit(long candidate, long victim) {
+  private boolean admit(Node candidate, Node victim) {
     sketch.reportMiss();
 
-    long candidateFreq = sketch.frequency(candidate);
-    long victimFreq = sketch.frequency(victim);
-    if (candidateFreq > victimFreq) {
-      policyStats.recordAdmission();
-      return true;
+    long candidateFreq = sketch.frequency(candidate.key);
+    long victimFreq = sketch.frequency(victim.key);
+    switch (version) {
+    case SIMPLE:
+      if (candidateFreq > victimFreq) {
+        policyStats.recordAdmission();
+        return true;
+      }
+      break;
+    case SCALED:
+      if ( (victim.weight * candidateFreq) > (victimFreq * candidate.weight) ) {
+        policyStats.recordAdmission();
+        return true;
+      }
+      break;
     }
     policyStats.recordRejection();
     return false;
@@ -294,6 +316,15 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
       prev = tail;
     }
 
+    /** Appends the node to the next of the list head. */
+    public void appendNextToHead(Node head) {
+      Node nextHead = head.next;
+      head.next = this;
+      nextHead.prev = this;
+      prev = head;
+      next = nextHead;
+    }
+    
     /** Removes the node from the list. */
     public void remove() {
       prev.next = next;
@@ -313,6 +344,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   static enum Version {
     SIMPLE,
+    SCALED,
   }
   
   public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
