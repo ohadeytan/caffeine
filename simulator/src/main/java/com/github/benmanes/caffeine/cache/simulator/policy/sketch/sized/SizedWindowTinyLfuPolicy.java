@@ -55,19 +55,19 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
   protected final PolicyStats policyStats;
   protected final Frequency sketch;
-  protected final int maximumSize;
+  protected final long maximumSize;
   
   private final Node headWindow;
   protected final Node headProbation;
   protected final Node headProtected;
 
-  protected final int maxWindow;
-  private final int maxProtected;
-  protected final int maxMain;
+  protected final long maxWindow;
+  private final long maxProtected;
+  protected final long maxMain;
 
-  protected int sizeWindow;
-  private int sizeProtected;
-  protected int sizeData;
+  protected long sizeWindow;
+  private long sizeProtected;
+  protected long sizeData;
   
 
   public SizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
@@ -75,11 +75,11 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     this.policyStats = new PolicyStats(name);
     this.sketch = new PeriodicResetCountMin4(settings.config());
 
-    this.maxMain = (int) (settings.maximumSize() * percentMain);
-    this.maxProtected = (int) (maxMain * settings.percentMainProtected());
-    this.maxWindow = settings.maximumSize() - maxMain;
+    this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
+    this.maxProtected = (long) (maxMain * settings.percentMainProtected());
+    this.maxWindow = settings.maximumSizeLong() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSize();
+    this.maximumSize = settings.maximumSizeLong();
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();

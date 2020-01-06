@@ -80,6 +80,10 @@ public class BasicSettings {
     return config().getInt("maximum-size");
   }
 
+  public long maximumSizeLong() {
+    return config().getLong("maximum-size");
+  }
+
   public boolean isFiles() {
     return config().getString("source").equals("files");
   }

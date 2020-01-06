@@ -43,7 +43,7 @@ public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy 
   @Override
   protected void coreEviction(Node candidate) {
     int candidateFreq = sketch.frequency(candidate.key);
-    int sizeNeeded = (sizeData + candidate.weight - sizeWindow) - maxMain;
+    long sizeNeeded = (sizeData + candidate.weight - sizeWindow) - maxMain;
     int victimsSize = 0;
     int victimsNum = 0;
     int victimsFreq = 0;
