@@ -13,23 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.benmanes.caffeine.cache.simulator.policy.sketch;
+package com.github.benmanes.caffeine.cache.simulator.policy.sketch.sized;
 
 import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic.WEIGHTED;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toSet;
 
-import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.lang3.StringUtils;
-
-import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
-import com.github.benmanes.caffeine.cache.simulator.policy.sketch.SizedWindowTinyLfuPolicy.Node;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
-import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
-import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
@@ -58,33 +51,30 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public final class SizedWindowTinyLfuPolicy implements Policy{
+public class SizedWindowTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
-  private final PolicyStats policyStats;
-  private final Frequency sketch;
-  private final int maximumSize;
-  private final Version version;
+  protected final PolicyStats policyStats;
+  protected final Frequency sketch;
+  protected final int maximumSize;
   
   private final Node headWindow;
-  private final Node headProbation;
-  private final Node headProtected;
+  protected final Node headProbation;
+  protected final Node headProtected;
 
-  private final int maxWindow;
+  protected final int maxWindow;
   private final int maxProtected;
-  private final int maxMain;
+  protected final int maxMain;
 
-  private int sizeWindow;
+  protected int sizeWindow;
   private int sizeProtected;
-  private int sizeData;
+  protected int sizeData;
   
 
-  public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
-    this.version = settings.version();
-    String name = String.format("sketch." + StringUtils.capitalize(version.name().toLowerCase()) + 
-        "SizedWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+  public SizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
+    String name = String.format("sketch.sized.WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
     this.sketch = new PeriodicResetCountMin4(settings.config());
-    
+
     this.maxMain = (int) (settings.maximumSize() * percentMain);
     this.maxProtected = (int) (maxMain * settings.percentMainProtected());
     this.maxWindow = settings.maximumSize() - maxMain;
@@ -97,7 +87,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
+    WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
     return settings.percentMain().stream()
         .map(percentMain -> new SizedWindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
@@ -142,7 +132,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
     sketch.increment(key);
 
-    if (weight > (maximumSize - maxWindow)) {
+    if (weight > (maxMain)) {
       policyStats.recordRejection();
       return;
     }
@@ -199,104 +189,46 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
       Node candidate = headCandidates.prev;
       candidate.remove();
       if ((sizeData + candidate.weight - sizeWindow) > maxMain) {
-        switch (version) {
-        case CAFFEINE: {
-          Node victim = getVictim();
-          if (admit(candidate, victim)) {
-            policyStats.recordAdmission();
-            sizeData += candidate.weight;
-            while ((sizeData - sizeWindow) > maxMain) {
-              Node evict = getVictim();
-              data.remove(evict.key);
-              sizeData -= evict.weight;
-              if (evict.status == Status.PROTECTED) {
-                sizeProtected -= evict.weight;
-              }
-              evict.remove();
-              policyStats.recordEviction();
-            }
-            candidate.appendToTail(headProbation);
-          } else {
-            data.remove(candidate.key);
-            policyStats.recordEviction();
-            policyStats.recordRejection();
-          }
-          break;
-        }
-        case RISTRETTO: {
-          while ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
-            Node victim = getVictim();
-            if (admit(candidate, victim)) {
-              data.remove(victim.key);
-              sizeData -= victim.weight;
-              if (victim.status == Status.PROTECTED) {
-                sizeProtected -= victim.weight;
-              }
-              victim.remove();
-              policyStats.recordEviction();
-            } else {
-              break;
-            }
-          }
-          if ((sizeData + candidate.weight - sizeWindow) <= (maximumSize - maxWindow)) {
-            policyStats.recordAdmission();
-            sizeData += candidate.weight;
-            candidate.appendToTail(headProbation);
-          } else {
-            policyStats.recordRejection();
-            data.remove(candidate.key);
-            policyStats.recordEviction();
-          }
-          break;
-        }
-        case SUM: {
-          int candidateFreq = sketch.frequency(candidate.key);
-          int sizeNeeded = (sizeData + candidate.weight - sizeWindow) - maxMain;
-          int victimsSize = 0;
-          int victimsNum = 0;
-          int victimsFreq = 0;
-          Node victim = headProbation;
-          while (victimsSize < sizeNeeded) {
-            if (victim.next != headProbation) {
-              victim = victim.next;
-            } else {
-              victim = headProtected.next;
-            }
-            victimsSize += victim.weight;
-            victimsNum++;
-            victimsFreq += sketch.frequency(victim.key);
-            if (victimsFreq > candidateFreq) {
-              break;
-            }
-          }
-          if (victimsFreq > candidateFreq) {
-            policyStats.recordRejection();
-            data.remove(candidate.key);
-            policyStats.recordEviction();            
-          } else {
-            for (int i = 0; i < victimsNum; i++) {
-              Node evict = getVictim();
-              data.remove(evict.key);
-              sizeData -= evict.weight;
-              if (evict.status == Status.PROTECTED) {
-                sizeProtected -= evict.weight;
-              }
-              evict.remove();
-              policyStats.recordEviction();              
-            }
-            policyStats.recordAdmission();
-            candidate.appendToTail(headProbation);
-            sizeData += candidate.weight;
-          }
-          break;
-        }
-        }
+        coreEviction(candidate);
       } else {
-        policyStats.recordAdmission();
-        candidate.appendToTail(headProbation);
-        sizeData += candidate.weight;
+        admit(candidate);
       }
     }
+  }
+  
+  protected void coreEviction(Node candidate) {
+    Node victim = getVictim();
+    if (sketch.frequency(candidate.key) > sketch.frequency(victim.key)) {
+      while ((sizeData + candidate.weight - sizeWindow) > maxMain) {
+        Node evict = getVictim();
+        evictNode(evict);
+      }
+      admit(candidate);
+    } else {
+      reject(candidate);
+    }    
+  }
+  
+  protected void admit(Node candidate) {
+    candidate.appendToTail(headProbation);
+    sizeData += candidate.weight;
+    policyStats.recordAdmission();
+  }
+
+  protected void reject(Node candidate) {
+    data.remove(candidate.key);
+    policyStats.recordEviction();            
+    policyStats.recordRejection();
+  }
+  
+  protected void evictNode(Node evict) {
+    data.remove(evict.key);
+    sizeData -= evict.weight;
+    if (evict.status == Status.PROTECTED) {
+      sizeProtected -= evict.weight;
+    }
+    evict.remove();
+    policyStats.recordEviction();    
   }
 
   /**
@@ -314,17 +246,7 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
   
-  private boolean admit(Node candidate, Node victim) {
-    sketch.reportMiss();
-    long candidateFreq = sketch.frequency(candidate.key);
-    long victimFreq = sketch.frequency(victim.key);
-    if (candidateFreq > victimFreq) {
-      return true;
-    }
-    return false;
-  }
-
-  private Node getVictim() {
+  protected Node getVictim() {
     if (headProbation.next != headProbation) {
       return headProbation.next;
     }
@@ -413,18 +335,18 @@ public final class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
 
-  static enum Version {
-    SUM,
-    CAFFEINE,
-    RISTRETTO,
-  }
-  
-  public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
-    public SizedWindowTinyLfuSettings(Config config) {
-      super(config);
-    }
-    public Version version() {
-      return Version.valueOf(config().getString("sized-window-tiny-lfu.version").toUpperCase());
-    }
-  }
+//  static enum Version {
+//    SUM,
+//    CAFFEINE,
+//    RISTRETTO,
+//  }
+//  
+//  public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
+//    public SizedWindowTinyLfuSettings(Config config) {
+//      super(config);
+//    }
+//    public Version version() {
+//      return Version.valueOf(config().getString("sized-window-tiny-lfu.version").toUpperCase());
+//    }
+//  }
 }
