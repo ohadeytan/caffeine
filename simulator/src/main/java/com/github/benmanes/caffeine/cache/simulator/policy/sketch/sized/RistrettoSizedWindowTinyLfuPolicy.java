@@ -25,15 +25,16 @@ import com.typesafe.config.Config;
 
 public final class RistrettoSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy {
 
-  public RistrettoSizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
+  public RistrettoSizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     super(percentMain, settings);
-    String name = String.format("sketch.sized.RistrettoWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
+        + "RistrettoWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     policyStats.setName(name);
   }
   
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
+    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
     return settings.percentMain().stream()
         .map(percentMain -> new RistrettoSizedWindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
@@ -44,7 +45,7 @@ public final class RistrettoSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuP
   protected void coreEviction(Node candidate) {
     while ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
       Node victim = getVictim();
-      if (sketch.frequency(candidate.key) > sketch.frequency(victim.key)) {
+      if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
         evictNode(victim);
       } else {
         break;
