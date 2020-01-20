@@ -64,16 +64,19 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   protected final long maxWindow;
   private final long maxProtected;
   protected final long maxMain;
+  protected final boolean scaled;
 
   protected long sizeWindow;
   private long sizeProtected;
   protected long sizeData;
   
 
-  public SizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
-    String name = String.format("sketch.sized.WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
-    this.policyStats = new PolicyStats(name);
+  public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     this.sketch = new PeriodicResetCountMin4(settings.config());
+    this.scaled = settings.scaled();
+    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
+        + "WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+    this.policyStats = new PolicyStats(name);
 
     this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
     this.maxProtected = (long) (maxMain * settings.percentMainProtected());
@@ -87,7 +90,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
+    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
     return settings.percentMain().stream()
         .map(percentMain -> new SizedWindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
@@ -198,7 +201,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   
   protected void coreEviction(Node candidate) {
     Node victim = getVictim();
-    if (sketch.frequency(candidate.key) > sketch.frequency(victim.key)) {
+    if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
       while ((sizeData + candidate.weight - sizeWindow) > maxMain) {
         Node evict = getVictim();
         evictNode(evict);
@@ -207,6 +210,13 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     } else {
       reject(candidate);
     }    
+  }
+  
+  protected boolean compare(int candidateFreq, int candidateWeight, int victimFreq, int victimWeight) {
+    if (scaled) {
+      return (candidateFreq * victimWeight) > (victimFreq * candidateWeight);
+    }
+    return candidateFreq > victimFreq;
   }
   
   protected void admit(Node candidate) {
@@ -335,18 +345,12 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     }
   }
 
-//  static enum Version {
-//    SUM,
-//    CAFFEINE,
-//    RISTRETTO,
-//  }
-//  
-//  public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
-//    public SizedWindowTinyLfuSettings(Config config) {
-//      super(config);
-//    }
-//    public Version version() {
-//      return Version.valueOf(config().getString("sized-window-tiny-lfu.version").toUpperCase());
-//    }
-//  }
+  public static final class SizedWindowTinyLfuSettings extends WindowTinyLfuSettings {
+    public SizedWindowTinyLfuSettings(Config config) {
+      super(config);
+    }
+    public boolean scaled() {
+      return config().getBoolean("sized-window-tiny-lfu.scaled");
+    }
+  }
 }

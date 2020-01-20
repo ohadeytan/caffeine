@@ -25,15 +25,16 @@ import com.typesafe.config.Config;
 
 public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy {
 
-  public SumSizedWindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
+  public SumSizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     super(percentMain, settings);
-    String name = String.format("sketch.sized.SumWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
+        + "SumWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     policyStats.setName(name);
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
+    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
     return settings.percentMain().stream()
         .map(percentMain -> new SumSizedWindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
@@ -57,11 +58,11 @@ public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy 
       victimsSize += victim.weight;
       victimsNum++;
       victimsFreq += sketch.frequency(victim.key);
-      if (victimsFreq > candidateFreq) {
-        break;
-      }
+      //if (victimsFreq > candidateFreq) {
+      //  break;
+      //}
     }
-    if (victimsFreq > candidateFreq) {
+    if (!compare(candidateFreq, candidate.weight, victimsFreq, victimsSize)) {
        reject(candidate);
     } else {
       for (int i = 0; i < victimsNum; i++) {
