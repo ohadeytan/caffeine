@@ -55,6 +55,9 @@ public final class RistrettoSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuP
       admit(candidate);
     } else {
       reject(candidate);
+      if (bump) {
+        promote(getVictim());
+      }
     }
   }
 }

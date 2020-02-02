@@ -65,6 +65,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   private final long maxProtected;
   protected final long maxMain;
   protected final boolean scaled;
+  protected final boolean bump;
 
   protected long sizeWindow;
   private long sizeProtected;
@@ -78,6 +79,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
         + "WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
 
+    this.bump = settings.bump();
     this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
     this.maxProtected = (long) (maxMain * settings.percentMainProtected());
     this.maxWindow = settings.maximumSizeLong() - maxMain;
@@ -209,9 +211,31 @@ public class SizedWindowTinyLfuPolicy implements Policy{
       admit(candidate);
     } else {
       reject(candidate);
+      if (bump) {
+        promote(getVictim());
+      }
     }    
   }
   
+  protected void promote(Node node) {
+    if (node.status == Status.PROTECTED) {
+      node.moveToTail(headProtected);
+    } else if (node.status == Status.PROBATION) {
+      node.remove();
+      node.status = Status.PROTECTED;
+      node.appendToTail(headProtected);
+
+      sizeProtected += node.weight;
+      while (sizeProtected > maxProtected) {
+        Node demote = headProtected.next;
+        demote.remove();
+        demote.status = Status.PROBATION;
+        demote.appendToTail(headProbation);
+        sizeProtected -= demote.weight;
+      }
+    }
+  }
+
   protected boolean compare(int candidateFreq, int candidateWeight, int victimFreq, int victimWeight) {
     if (scaled) {
       return (candidateFreq * victimWeight) > (victimFreq * candidateWeight);
@@ -351,6 +375,9 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     }
     public boolean scaled() {
       return config().getBoolean("sized-window-tiny-lfu.scaled");
+    }
+    public boolean bump() {
+      return config().getBoolean("sized-window-tiny-lfu.bump");
     }
   }
 }

@@ -64,6 +64,11 @@ public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy 
     }
     if (!compare(candidateFreq, candidate.weight, victimsFreq, victimsSize)) {
        reject(candidate);
+       if (bump) {
+         for (int i = 0; i < victimsNum; i++) {
+           promote(getVictim());
+         }
+       }
     } else {
       for (int i = 0; i < victimsNum; i++) {
         Node evict = getVictim();
