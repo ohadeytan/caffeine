@@ -24,7 +24,7 @@ import com.typesafe.config.Config;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public final class SimpleClimber extends AbstractClimber {
+public class SimpleClimber extends AbstractClimber {
   private final double restartThreshold;
   private final double initialStepSize;
   private final double sampleDecayRate;

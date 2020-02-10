@@ -32,8 +32,8 @@ import java.util.Set;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
-import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
-import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
+import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
+import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
@@ -59,18 +59,20 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   private final Long2ObjectMap<Node> data;
   private final PolicyStats policyStats;
   private final HillClimber climber;
-  private final Admittor admittor;
-  private final int maximumSize;
+  private final PeriodicResetCountMin4 sketch;
+  private final long maximumSize;
 
   private final Node headWindow;
   private final Node headProbation;
   private final Node headProtected;
 
-  private int maxWindow;
-  private int maxProtected;
-
-  private double windowSize;
-  private double protectedSize;
+  private long maxWindow;
+  private long maxProtected;
+  private boolean isFull;
+  
+  private long windowSize;
+  private long protectedSize;
+  private int sizeData;
 
   static final boolean debug = false;
   static final boolean trace = false;
@@ -78,26 +80,27 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   public SizedHillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
       HillClimberWindowTinyLfuSettings settings) {
 
-    int maxMain = (int) (settings.maximumSize() * percentMain);
-    this.maxProtected = (int) (maxMain * settings.percentMainProtected());
-    this.maxWindow = settings.maximumSize() - maxMain;
+    long maxMain = (long) (settings.maximumSizeLong() * percentMain);
+    this.maxProtected = (long) (maxMain * settings.percentMainProtected());
+    this.maxWindow = settings.maximumSizeLong() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSize();
+    this.maximumSize = settings.maximumSizeLong();
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();
-
+    this.isFull = false;
+    
     this.strategy = strategy;
     this.initialPercentMain = percentMain;
     this.policyStats = new PolicyStats(getPolicyName());
-    this.admittor = new TinyLfu(settings.config(), policyStats);
+    this.sketch = new PeriodicResetCountMin4(settings.config());
     this.climber = strategy.create(settings.config());
 
     printSegmentSizes();
   }
 
   private String getPolicyName() {
-    return String.format("sketch.HillClimberWindowTinyLfu (%s %.0f%% -> %.0f%%)",
+    return String.format("sketch.sized.HillClimberWindowTinyLfu (%s %.0f%% -> %.0f%%)",
         strategy.name().toLowerCase(US), 100 * (1.0 - initialPercentMain),
         (100.0 * maxWindow) / maximumSize);
   }
@@ -129,26 +132,29 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   public void record(AccessEvent event) {
     final long key = event.key();
     final int weight = event.weight();
-    boolean isFull = (data.size() >= maximumSize);
     policyStats.recordOperation();
     Node node = data.get(key);
-    admittor.record(key);
+    if (sizeData >= (maximumSize >>> 1)) {
+      sketch.ensureCapacity(data.size());
+      if ((sizeData + weight) >= maximumSize) {
+        isFull = true;
+      }
+    }
+    sketch.increment(key);
 
     QueueType queue = null;
     if (node == null) {
-      onMiss(key);
+      onMiss(key, weight);
       policyStats.recordWeightedMiss(weight);
     } else {
       queue = node.queue;
+      policyStats.recordWeightedHit(weight);
       if (queue == WINDOW) {
         onWindowHit(node);
-        policyStats.recordWeightedHit(weight);;
       } else if (queue == PROBATION) {
         onProbationHit(node);
-        policyStats.recordWeightedHit(weight);
       } else if (queue == PROTECTED) {
         onProtectedHit(node);
-        policyStats.recordWeightedHit(weight);
       } else {
         throw new IllegalStateException();
       }
@@ -157,11 +163,21 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   }
 
   /** Adds the entry to the admission window, evicting if necessary. */
-  private void onMiss(long key) {
-    Node node = new Node(key, WINDOW);
-    node.appendToTail(headWindow);
+  private void onMiss(long key, int weight) {
+    if (weight > (maximumSize - maxWindow)) {
+      policyStats.recordRejection();
+      return;
+    }
+
+    Node node = new Node(key, weight, WINDOW);
+    if (weight > maxWindow) {
+      node.appendToHead(headWindow);  
+    } else {
+      node.appendToTail(headWindow);
+    }
     data.put(key, node);
-    windowSize++;
+    windowSize += weight;
+    sizeData += weight;
     evict();
   }
 
@@ -175,18 +191,17 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     node.remove();
     node.queue = PROTECTED;
     node.appendToTail(headProtected);
-
-    protectedSize++;
+    protectedSize += node.weight;
     demoteProtected();
   }
 
   private void demoteProtected() {
-    if (protectedSize > maxProtected) {
+    while (protectedSize > maxProtected) {
       Node demote = headProtected.next;
       demote.remove();
       demote.queue = PROBATION;
       demote.appendToTail(headProbation);
-      protectedSize--;
+      protectedSize -= demote.weight;
     }
   }
 
@@ -200,27 +215,83 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
    * then the admission candidate and probation's victim are evaluated and one is evicted.
    */
   private void evict() {
-    if (windowSize <= maxWindow) {
-      return;
-    }
-
-    Node candidate = headWindow.next;
-    windowSize--;
-
-    candidate.remove();
-    candidate.queue = PROBATION;
-    candidate.appendToTail(headProbation);
-
-    if (data.size() > maximumSize) {
-      Node victim = headProbation.next;
-      Node evict = admittor.admit(candidate.key, victim.key) ? victim : candidate;
-      data.remove(evict.key);
-      evict.remove();
-
-      policyStats.recordEviction();
+    final Node headCandidates = new Node();
+    collectCandidates(headCandidates);    
+    while (headCandidates.prev != headCandidates) {
+      Node candidate = headCandidates.prev;
+      candidate.remove();
+      if ((sizeData + candidate.weight - windowSize) > (maximumSize - maxWindow)) {
+        coreEviction(candidate);
+      } else {
+        admit(candidate);
+      }
     }
   }
+  
+  protected void coreEviction(Node candidate) {
+    if (candidate.weight > (maximumSize - maxWindow)) {
+      reject(candidate);
+      return;
+    }
+    Node victim = getVictim();
+    if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
+      while ((sizeData + candidate.weight - windowSize) > (maximumSize - maxWindow)) {
+        Node evict = getVictim();
+        evictNode(evict);
+      }
+      admit(candidate);
+    } else {
+      reject(candidate);
+    }    
+  }
+  
+  protected boolean compare(int candidateFreq, int candidateWeight, int victimFreq, int victimWeight) {
+    return candidateFreq > victimFreq;
+  }
+  
+  protected void admit(Node candidate) {
+    candidate.appendToTail(headProbation);
+    sizeData += candidate.weight;
+    policyStats.recordAdmission();
+  }
 
+  protected void reject(Node candidate) {
+    data.remove(candidate.key);
+    policyStats.recordEviction();            
+    policyStats.recordRejection();
+  }
+  
+  protected void evictNode(Node evict) {
+    data.remove(evict.key);
+    sizeData -= evict.weight;
+    if (evict.queue == PROTECTED) {
+      protectedSize -= evict.weight;
+    }
+    evict.remove();
+    policyStats.recordEviction();    
+  }
+
+  /**
+   * Collect candidates  for eviction from the Window
+   */
+  private void collectCandidates(final Node headCandidates) {
+    while (windowSize > maxWindow) {
+      Node candidate = headWindow.next;
+      candidate.queue = PROBATION;
+      windowSize -= candidate.weight;
+      sizeData -= candidate.weight;
+      candidate.remove();
+      candidate.appendToTail(headCandidates);
+    }
+  }
+  
+  protected Node getVictim() {
+    if (headProbation.next != headProbation) {
+      return headProbation.next;
+    }
+    return headProtected.next;
+  }
+  
   /** Performs the hill climbing process. */
   private void climb(long key, @Nullable QueueType queue, boolean isFull) {
     if (queue == null) {
@@ -230,68 +301,80 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     }
 
     double probationSize = maximumSize - windowSize - protectedSize;
-    Adaptation adaptation = climber.adapt(windowSize, probationSize, protectedSize, isFull);
-    if (adaptation.type == INCREASE_WINDOW) {
-      increaseWindow(adaptation.amount);
-    } else if (adaptation.type == DECREASE_WINDOW) {
-      decreaseWindow(adaptation.amount);
+    if (isFull && sketch.isGoingToReset()) {
+      Adaptation adaptation = climber.adapt(windowSize, probationSize, protectedSize, isFull);
+      if (adaptation.type == INCREASE_WINDOW) {
+        increaseWindow(adaptation.amount);
+      } else if (adaptation.type == DECREASE_WINDOW) {
+        decreaseWindow(adaptation.amount);
+      }
     }
   }
 
   private void increaseWindow(double amount) {
     checkState(amount >= 0.0);
-    if (maxProtected == 0) {
+    if (maxProtected <= 0) {
       return;
     }
+    
+    long quota = Math.min((long) amount, maxProtected);
 
-    double quota = Math.min(amount, maxProtected);
-    int steps = (int) (windowSize + quota) - (int) windowSize;
-    windowSize += quota;
+    maxWindow += quota;
+    maxProtected -= quota;
 
-    for (int i = 0; i < steps; i++) {
-      maxWindow++;
-      maxProtected--;
-
-      demoteProtected();
-      Node candidate = headProbation.next;
-      candidate.remove();
+    demoteProtected();
+    while ((sizeData - windowSize) > (maximumSize - maxWindow)) {
+      Node candidate = getVictim();
+      if (candidate.queue == PROTECTED) {
+        protectedSize -= candidate.weight;
+      }
       candidate.queue = WINDOW;
-      candidate.appendToTail(headWindow);
+      candidate.remove();
+      candidate.appendToHead(headWindow);
+      windowSize += candidate.weight;
     }
+    evict();
+    
     checkState(windowSize >= 0);
     checkState(maxWindow >= 0);
     checkState(maxProtected >= 0);
+    checkState(sizeData <= maximumSize);
+    checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("+%,d (%,d -> %,d)%n", steps, maxWindow - steps, maxWindow);
+      System.out.printf("+%,d (%,d -> %,d)%n", (int) quota, maxWindow - (int) quota, maxWindow);
     }
   }
 
   private void decreaseWindow(double amount) {
     checkState(amount >= 0.0);
-    if (maxWindow == 0) {
+    if (maxWindow <= 0) {
       return;
     }
+    
+    long quota = Math.min((long) amount, maxWindow);
+    checkState(quota >= 0);
+    maxWindow -= quota;
+    maxProtected += quota;
 
-    double quota = Math.min(amount, maxWindow);
-    int steps = (int) windowSize - (int) (windowSize - quota);
-    windowSize -= quota;
-
-    for (int i = 0; i < steps; i++) {
-      maxWindow--;
-      maxProtected++;
-
-      Node candidate = headWindow.next;
-      candidate.remove();
+    Node candidate = headWindow.next;
+    while ((windowSize > maxWindow) && (sizeData - windowSize + candidate.weight) <= (maximumSize - maxWindow)) {
       candidate.queue = PROBATION;
+      candidate.remove();
       candidate.appendToHead(headProbation);
+      windowSize -= candidate.weight;
+      candidate = headWindow.next;
     }
+    evict();
+    
     checkState(windowSize >= 0);
     checkState(maxWindow >= 0);
     checkState(maxProtected >= 0);
+    checkState(sizeData <= maximumSize);
+    checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("-%,d (%,d -> %,d)%n", steps, maxWindow + steps, maxWindow);
+      System.out.printf("-%,d (%,d -> %,d)%n", (int) quota, maxWindow + (int) quota, maxWindow);
     }
   }
 
@@ -303,14 +386,14 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   }
 
   @Override
-  public void finished() {
+  public void finished() {    
     policyStats.setName(getPolicyName());
     printSegmentSizes();
 
-    long actualWindowSize = data.values().stream().filter(n -> n.queue == WINDOW).count();
-    long actualProbationSize = data.values().stream().filter(n -> n.queue == PROBATION).count();
-    long actualProtectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).count();
-    long calculatedProbationSize = data.size() - actualWindowSize - actualProtectedSize;
+    long actualWindowSize = data.values().stream().filter(n -> n.queue == WINDOW).mapToInt(node -> node.weight).sum();
+    long actualProbationSize = data.values().stream().filter(n -> n.queue == PROBATION).mapToInt(node -> node.weight).sum();
+    long actualProtectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).mapToInt(node -> node.weight).sum();
+    long calculatedProbationSize = sizeData - actualWindowSize - actualProtectedSize;
 
     checkState((long) windowSize == actualWindowSize,
         "Window: %s != %s", (long) windowSize, actualWindowSize);
@@ -318,12 +401,13 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
         "Protected: %s != %s", (long) protectedSize, actualProtectedSize);
     checkState(actualProbationSize == calculatedProbationSize,
         "Probation: %s != %s", actualProbationSize, calculatedProbationSize);
-    checkState(data.size() <= maximumSize, "Maximum: %s > %s", data.size(), maximumSize);
+    checkState(sizeData <= maximumSize, "Maximum: %s > %s", sizeData, maximumSize);
   }
 
   /** A node on the double-linked list. */
   static final class Node {
     final long key;
+    final int weight;
 
     QueueType queue;
     Node prev;
@@ -332,14 +416,16 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     /** Creates a new sentinel node. */
     public Node() {
       this.key = Integer.MIN_VALUE;
+      this.weight = 0;
       this.prev = this;
       this.next = this;
     }
 
     /** Creates a new, unlinked node. */
-    public Node(long key, QueueType queue) {
+    public Node(long key, int weight, QueueType queue) {
       this.queue = queue;
       this.key = key;
+      this.weight = weight;
     }
 
     public void moveToTail(Node head) {
@@ -376,6 +462,7 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     public String toString() {
       return MoreObjects.toStringHelper(this)
           .add("key", key)
+          .add("weight", weight)
           .add("queue", queue)
           .toString();
     }

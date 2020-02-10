@@ -89,4 +89,9 @@ public final class PeriodicResetCountMin4 extends CountMin4 {
     additions = (additions >>> 1) - (count >>> 2);
     doorkeeper.clear();
   }
+  
+  public boolean isGoingToReset() {
+    return (additions + 1) == period;
+    
+  }
 }
