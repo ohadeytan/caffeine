@@ -13,38 +13,51 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.benmanes.caffeine.cache.simulator.policy.sketch.sized;
+package com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized;
 
+import static java.util.Locale.US;
 import static java.util.stream.Collectors.toSet;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberType;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.SizedHillClimberWindowTinyLfuPolicy.HillClimberWindowTinyLfuSettings;
 import com.typesafe.config.Config;
 
-public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy {
+public final class SumSizedHillClimberWindowTinyLfuPolicy extends SizedHillClimberWindowTinyLfuPolicy {
 
-  public SumSizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
-    super(percentMain, settings);
-    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
-        + "SumWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
-    policyStats.setName(name);
+  public SumSizedHillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
+      HillClimberWindowTinyLfuSettings settings) {
+    super(strategy, percentMain, settings);
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
-    SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
-    return settings.percentMain().stream()
-        .map(percentMain -> new SumSizedWindowTinyLfuPolicy(percentMain, settings))
-        .collect(toSet());
+    HillClimberWindowTinyLfuSettings settings = new HillClimberWindowTinyLfuSettings(config);
+    Set<Policy> policies = new HashSet<>();
+    for (HillClimberType climber : settings.strategy()) {
+      for (double percentMain : settings.percentMain()) {
+        policies.add(new SumSizedHillClimberWindowTinyLfuPolicy(climber, percentMain, settings));
+      }
+    }
+    return policies;
+  }
+
+  @Override
+  public String getPolicyName() {
+    return String.format("sketch.sized.SumHillClimberWindowTinyLfu (%s %.0f%% -> %.0f%%)",
+        strategy.name().toLowerCase(US), 100 * (1.0 - initialPercentMain),
+        (100.0 * maxWindow) / maximumSize);
   }
 
   
   @Override
   protected void coreEviction(Node candidate) {
     int candidateFreq = sketch.frequency(candidate.key);
-    long sizeNeeded = (sizeData + candidate.weight - sizeWindow) - maxMain;
+    long sizeNeeded = (sizeData + candidate.weight - windowSize) - (maximumSize - maxWindow);
     int victimsSize = 0;
     int victimsNum = 0;
     int victimsFreq = 0;
@@ -61,11 +74,6 @@ public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy 
     }
     if (!compare(candidateFreq, candidate.weight, victimsFreq, victimsSize)) {
        reject(candidate);
-       if (bump) {
-         for (int i = 0; i < victimsNum; i++) {
-           promote(getVictim());
-         }
-       }
     } else {
       for (int i = 0; i < victimsNum; i++) {
         Node evict = getVictim();

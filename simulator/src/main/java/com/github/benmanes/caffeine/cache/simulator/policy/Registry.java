@@ -59,7 +59,9 @@ import com.github.benmanes.caffeine.cache.simulator.policy.sketch.sized.SumSized
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.sized.RistrettoSizedWindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberWindowTinyLfuPolicy;
-import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.SizedHillClimberWindowTinyLfuPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.RistrettoSizedHillClimberWindowTinyLfuPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.SizedHillClimberWindowTinyLfuPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.SumSizedHillClimberWindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.feedback.FeedbackTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.feedback.FeedbackWindowTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.segment.FullySegmentedWindowTinyLfuPolicy;
@@ -162,6 +164,8 @@ public final class Registry {
 
     factories.put("sketch.HillClimberWindowTinyLfu", HillClimberWindowTinyLfuPolicy::policies);
     factories.put("sketch.SizedHillClimberWindowTinyLfu", SizedHillClimberWindowTinyLfuPolicy::policies);
+    factories.put("sketch.SumSizedHillClimberWindowTinyLfu", SumSizedHillClimberWindowTinyLfuPolicy::policies);
+    factories.put("sketch.RistrettoSizedHillClimberWindowTinyLfu", RistrettoSizedHillClimberWindowTinyLfuPolicy::policies);
 
     factories.put("sketch.TinyCache", TinyCachePolicy::policies);
     factories.put("sketch.WindowTinyCache", WindowTinyCachePolicy::policies);
