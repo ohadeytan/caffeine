@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing;
+package com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized;
 
 import static com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.Adaptation.Type.DECREASE_WINDOW;
 import static com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.Adaptation.Type.INCREASE_WINDOW;
@@ -32,13 +32,14 @@ import java.util.Set;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
-import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.Adaptation;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.QueueType;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberType;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
@@ -53,26 +54,26 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  * @author ben.manes@gmail.com (Ben Manes)
  */
 @SuppressWarnings("PMD.TooManyFields")
-public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
-  private final double initialPercentMain;
-  private final HillClimberType strategy;
+public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
+  protected final double initialPercentMain;
+  protected final HillClimberType strategy;
   private final Long2ObjectMap<Node> data;
   private final PolicyStats policyStats;
   private final HillClimber climber;
-  private final PeriodicResetCountMin4 sketch;
-  private final long maximumSize;
+  protected final PeriodicResetCountMin4 sketch;
+  protected final long maximumSize;
 
   private final Node headWindow;
-  private final Node headProbation;
-  private final Node headProtected;
+  protected final Node headProbation;
+  protected final Node headProtected;
 
-  private long maxWindow;
+  protected long maxWindow;
   private long maxProtected;
   private boolean isFull;
   
-  private long windowSize;
+  protected long windowSize;
   private long protectedSize;
-  private int sizeData;
+  protected int sizeData;
 
   static final boolean debug = false;
   static final boolean trace = false;
@@ -99,7 +100,7 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     printSegmentSizes();
   }
 
-  private String getPolicyName() {
+  public String getPolicyName() {
     return String.format("sketch.sized.HillClimberWindowTinyLfu (%s %.0f%% -> %.0f%%)",
         strategy.name().toLowerCase(US), 100 * (1.0 - initialPercentMain),
         (100.0 * maxWindow) / maximumSize);
@@ -229,10 +230,6 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   }
   
   protected void coreEviction(Node candidate) {
-    if (candidate.weight > (maximumSize - maxWindow)) {
-      reject(candidate);
-      return;
-    }
     Node victim = getVictim();
     if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
       while ((sizeData + candidate.weight - windowSize) > (maximumSize - maxWindow)) {
@@ -277,11 +274,15 @@ public final class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   private void collectCandidates(final Node headCandidates) {
     while (windowSize > maxWindow) {
       Node candidate = headWindow.next;
-      candidate.queue = PROBATION;
       windowSize -= candidate.weight;
       sizeData -= candidate.weight;
       candidate.remove();
-      candidate.appendToTail(headCandidates);
+      if (candidate.weight > (maximumSize - maxWindow)) {
+        reject(candidate);
+      } else {
+        candidate.queue = PROBATION;
+        candidate.appendToTail(headCandidates);
+      }
     }
   }
   
