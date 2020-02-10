@@ -24,6 +24,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.gradi
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.gradient.Nadam;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.gradient.Stochastic;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.hill.SimpleClimber;
+import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.hill.TriggeredClimber;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.hill.SimulatedAnnealingClimber;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.inference.IndicatorClimber;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sim.MiniSimClimber;
@@ -38,6 +39,7 @@ import com.typesafe.config.Config;
 enum HillClimberType {
   // hill climbing
   SIMPLE(SimpleClimber::new),
+  TRIGGERED(TriggeredClimber::new),
   SIMULATED_ANNEALING(SimulatedAnnealingClimber::new),
 
   // gradient descent
