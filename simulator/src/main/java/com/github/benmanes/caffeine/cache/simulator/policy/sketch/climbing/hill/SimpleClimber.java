@@ -29,7 +29,7 @@ public class SimpleClimber extends AbstractClimber {
   private final double restartThreshold;
   private final double initialStepSize;
   private final double sampleDecayRate;
-  private final int initialSampleSize;
+  private final long initialSampleSize;
   private final double stepDecayRate;
   private final double tolerance;
 
@@ -38,9 +38,8 @@ public class SimpleClimber extends AbstractClimber {
 
   public SimpleClimber(Config config) {
     SimpleClimberSettings settings = new SimpleClimberSettings(config);
-    int maximumSize = Ints.checkedCast(settings.maximumSize());
-    this.initialSampleSize = (int) (settings.percentSample() * maximumSize);
-    this.initialStepSize = settings.percentPivot() * maximumSize;
+    this.initialSampleSize = (long) (settings.percentSample() * settings.maximumSizeLong());
+    this.initialStepSize = settings.percentPivot() * settings.maximumSizeLong();
     this.restartThreshold = settings.restartThreshold();
     this.sampleDecayRate = settings.sampleDecayRate();
     this.stepDecayRate = settings.stepDecayRate();
@@ -66,9 +65,9 @@ public class SimpleClimber extends AbstractClimber {
     super.resetSample(hitRate);
 
     stepSize *= stepDecayRate;
-    sampleSize = (int) (sampleSize * sampleDecayRate);
+    sampleSize = (long) (sampleSize * sampleDecayRate);
     if ((stepSize <= 0.01) || (sampleSize <= 1)) {
-      sampleSize = Integer.MAX_VALUE;
+      sampleSize = Long.MAX_VALUE;
     }
   }
 
