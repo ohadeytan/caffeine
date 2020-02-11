@@ -23,7 +23,7 @@ import static com.google.common.base.Preconditions.checkState;
  * @author ben.manes@gmail.com (Ben Manes)
  */
 public abstract class AbstractClimber implements HillClimber {
-  protected int sampleSize;
+  protected long sampleSize;
   protected int hitsInMain;
   protected int hitsInWindow;
   protected int hitsInSample;

@@ -73,7 +73,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   
   protected long windowSize;
   private long protectedSize;
-  protected int sizeData;
+  protected long sizeData;
 
   static final boolean debug = false;
   static final boolean trace = false;
@@ -391,9 +391,9 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     policyStats.setName(getPolicyName());
     printSegmentSizes();
 
-    long actualWindowSize = data.values().stream().filter(n -> n.queue == WINDOW).mapToInt(node -> node.weight).sum();
-    long actualProbationSize = data.values().stream().filter(n -> n.queue == PROBATION).mapToInt(node -> node.weight).sum();
-    long actualProtectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).mapToInt(node -> node.weight).sum();
+    long actualWindowSize = data.values().stream().filter(n -> n.queue == WINDOW).mapToLong(node -> node.weight).sum();
+    long actualProbationSize = data.values().stream().filter(n -> n.queue == PROBATION).mapToLong(node -> node.weight).sum();
+    long actualProtectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).mapToLong(node -> node.weight).sum();
     long calculatedProbationSize = sizeData - actualWindowSize - actualProtectedSize;
 
     checkState((long) windowSize == actualWindowSize,
