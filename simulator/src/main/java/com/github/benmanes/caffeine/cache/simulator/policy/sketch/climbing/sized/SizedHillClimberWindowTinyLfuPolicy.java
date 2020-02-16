@@ -293,6 +293,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     return headProtected.next;
   }
   
+  int accesses;
   /** Performs the hill climbing process. */
   private void climb(long key, @Nullable QueueType queue, boolean isFull) {
     if (queue == null) {
@@ -302,14 +303,17 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     }
 
     double probationSize = maximumSize - windowSize - protectedSize;
-    if (isFull && sketch.isGoingToReset()) {
-      Adaptation adaptation = climber.adapt(windowSize, probationSize, protectedSize, isFull);
-      if (adaptation.type == INCREASE_WINDOW) {
-        increaseWindow(adaptation.amount);
-      } else if (adaptation.type == DECREASE_WINDOW) {
-        decreaseWindow(adaptation.amount);
+    //if (isFull && sketch.isGoingToReset()) {
+      if (++accesses == 1000000) {
+        accesses = 0;
+        Adaptation adaptation = climber.adapt(windowSize, probationSize, protectedSize, isFull);
+        if (adaptation.type == INCREASE_WINDOW) {
+          increaseWindow(adaptation.amount);
+        } else if (adaptation.type == DECREASE_WINDOW) {
+          decreaseWindow(adaptation.amount);
+        }
       }
-    }
+    //}
   }
 
   private void increaseWindow(double amount) {
@@ -343,7 +347,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("+%,d (%,d -> %,d)%n", (int) quota, maxWindow - (int) quota, maxWindow);
+      System.out.printf("+%,d (%,d -> %,d)%n", (long) quota, maxWindow - (long) quota, maxWindow);
     }
   }
 
@@ -375,7 +379,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("-%,d (%,d -> %,d)%n", (int) quota, maxWindow + (int) quota, maxWindow);
+      System.out.printf("-%,d (%,d -> %,d)%n", (long) quota, maxWindow + (long) quota, maxWindow);
     }
   }
 
