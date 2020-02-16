@@ -240,7 +240,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     if (scaled) {
       return (candidateFreq * victimWeight) > (victimFreq * candidateWeight);
     }
-    return candidateFreq > victimFreq;
+    return candidateFreq >= victimFreq;
   }
   
   protected void admit(Node candidate) {
