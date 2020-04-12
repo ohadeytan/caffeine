@@ -45,6 +45,7 @@ public final class RistrettoSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuP
   protected void coreEviction(Node candidate) {
     while ((sizeData + candidate.weight - sizeWindow) > (maximumSize - maxWindow)) {
       Node victim = getVictim();
+      victimsCount++;
       if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
         evictNode(victim);
       } else {
