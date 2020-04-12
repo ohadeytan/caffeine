@@ -58,7 +58,11 @@ public final class SumSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy 
       victimsSize += victim.weight;
       victimsNum++;
       victimsFreq += sketch.frequency(victim.key);
+      if (prune && victimsFreq > candidateFreq) {
+        break;
+      }
     }
+    victimsCount += victimsNum;
     if (!compare(candidateFreq, candidate.weight, victimsFreq, victimsSize)) {
        reject(candidate);
        if (bump) {

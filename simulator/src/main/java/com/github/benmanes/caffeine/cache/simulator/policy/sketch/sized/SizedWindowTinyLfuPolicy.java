@@ -66,10 +66,12 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   protected final long maxMain;
   protected final boolean scaled;
   protected final boolean bump;
+  protected final boolean prune;  
 
   protected long sizeWindow;
   private long sizeProtected;
   protected long sizeData;
+  protected long victimsCount;
   
 
   public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
@@ -80,6 +82,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     this.policyStats = new PolicyStats(name);
 
     this.bump = settings.bump();
+    this.prune = settings.prune();
     this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
     this.maxProtected = (long) (maxMain * settings.percentMainProtected());
     this.maxWindow = settings.maximumSizeLong() - maxMain;
@@ -203,9 +206,12 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   
   protected void coreEviction(Node candidate) {
     Node victim = getVictim();
+    victimsCount++;
     if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
+      victimsCount--;
       while ((sizeData + candidate.weight - sizeWindow) > maxMain) {
         Node evict = getVictim();
+        victimsCount++;
         evictNode(evict);
       }
       admit(candidate);
@@ -290,6 +296,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
 
   @Override
   public void finished() {
+    System.out.println("victims_count=" + victimsCount);
     long windowSize = data.values().stream().filter(n -> n.status == Status.WINDOW).mapToInt(node -> node.weight).sum();
     long probationSize = data.values().stream().filter(n -> n.status == Status.PROBATION).mapToInt(node -> node.weight).sum();
     long protectedSize = data.values().stream().filter(n -> n.status == Status.PROTECTED).mapToInt(node -> node.weight).sum();
@@ -378,6 +385,9 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     }
     public boolean bump() {
       return config().getBoolean("sized-window-tiny-lfu.bump");
+    }
+    public boolean prune() {
+      return config().getBoolean("sized-window-tiny-lfu.prune");
     }
   }
 }

@@ -46,7 +46,7 @@ public final class AdaptSizeReader extends TextTraceReader {
   @Override
   public Stream<AccessEvent> events() throws IOException {
     return lines()
-        .map(line -> line.split(" ", 3))
+        .map(line -> line.split(" ", 4))
         .map(array -> AccessEvent.forKeyAndWeight(
             Long.parseLong(array[1]), Integer.parseInt(array[2])));
   }
