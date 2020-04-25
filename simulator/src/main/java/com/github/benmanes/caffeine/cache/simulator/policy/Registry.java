@@ -44,6 +44,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.others.GDSF;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.Cache2kPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.CaffeinePolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.CollisionPolicy;
@@ -95,6 +96,7 @@ public final class Registry {
     registerProduct(factories);
     registerTwoQueue(factories);
     registerAdaptive(factories);
+    registerOthers(factories);
     return factories.entrySet().stream().collect(
         toMap(entry -> entry.getKey().toLowerCase(US), Entry::getValue));
   }
@@ -196,5 +198,9 @@ public final class Registry {
     factories.put("product.Collision", CollisionPolicy::policies);
     factories.put("product.ExpiringMap", ExpiringMapPolicy::policies);
     factories.put("product.Elasticsearch", ElasticSearchPolicy::policies);
+  }
+  
+  private static void registerOthers(Map<String, Function<Config, Set<Policy>>> factories) {
+    factories.put("others.GDSF", GDSF::policies);
   }
 }
