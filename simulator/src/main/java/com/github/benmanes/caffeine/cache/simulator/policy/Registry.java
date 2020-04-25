@@ -50,6 +50,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.others.GDSF;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.Cache2kPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.CaffeinePolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.Ehcache3Policy;
@@ -253,5 +254,9 @@ public final class Registry {
     static Factory of(Class<? extends Policy> policyClass, Function<Config, Set<Policy>> creator) {
       return new AutoValue_Registry_Factory(policyClass, creator);
     }
+  }
+  
+  private static void registerOthers(Map<String, Function<Config, Set<Policy>>> factories) {
+    factories.put("others.GDSF", GDSF::policies);
   }
 }
