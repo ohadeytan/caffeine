@@ -15,6 +15,8 @@
  */
 package com.github.benmanes.caffeine.cache.simulator.admission.perfect;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.google.common.primitives.Ints;
@@ -30,13 +32,12 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
  */
 public final class PerfectFrequency implements Frequency {
   private final Long2IntMap counts;
-  private final int sampleSize;
+  private long sampleSize;
 
-  private int size;
+  private long size;
 
   public PerfectFrequency(Config config) {
-    BasicSettings settings = new BasicSettings(config);
-    sampleSize = Ints.checkedCast(10 * settings.maximumSize());
+    sampleSize = 10 * new BasicSettings(config).maximumSize();
     counts = new Long2IntOpenHashMap();
   }
 
@@ -52,6 +53,15 @@ public final class PerfectFrequency implements Frequency {
     size++;
     if (size == sampleSize) {
       reset();
+    }
+  }
+
+  @Override
+  public void ensureCapacity(long maximumSize) {
+    checkArgument(maximumSize >= 0);
+    long maximum = Math.min(10 * maximumSize, Integer.MAX_VALUE >>> 1);
+    if (sampleSize < 10 * maximumSize) {
+      sampleSize = 10 * maximumSize;
     }
   }
 

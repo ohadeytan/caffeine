@@ -51,7 +51,6 @@ public final class LinkedPolicy implements Policy {
   final long maximumSize;
   final boolean weighted;
   final Node sentinel;
-
   long currentSize;
 
   public LinkedPolicy(Config config, Set<Characteristic> characteristics,

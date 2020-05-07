@@ -47,10 +47,10 @@ import com.typesafe.config.ConfigFactory;
  */
 @State(Benchmark)
 public class TraceBenchmark {
-  @Param({"linked.Lru", "sketch.WindowTinyLfu"})
+  @Param({"linked.Lru"})
   String policyName;
 
-  @Param({"0", "1000"})
+  @Param({"0"})
   int missPenalty;
 
   AccessEvent[] events;

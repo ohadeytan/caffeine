@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.mutable.Mutable;
@@ -160,7 +161,7 @@ public final class Simulator extends AbstractActor {
     if (reporter.stats().size() == seqAsJavaList(router.routees()).size()) {
       reporter.print();
       context().stop(self());
-      System.out.println("Executed in " + stopwatch);
+      System.out.println("Executed in " + stopwatch.elapsed(TimeUnit.SECONDS));
     }
   }
 
