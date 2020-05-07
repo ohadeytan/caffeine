@@ -24,6 +24,8 @@ import java.util.Set;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
+import com.github.benmanes.caffeine.cache.simulator.admission.countmin64.CountMin64TinyLfu;
+import com.github.benmanes.caffeine.cache.simulator.admission.perfect.PerfectFrequency;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
@@ -76,6 +78,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
 
   public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     this.sketch = new PeriodicResetCountMin4(settings.config());
+    //this.sketch = new PerfectFrequency(settings.config());
     this.scaled = settings.scaled();
     String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
         + "WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));

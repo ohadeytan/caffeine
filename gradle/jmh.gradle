@@ -56,10 +56,10 @@ jmh {
   resultFormat = 'json'
   resultsFile = file("${buildDir}/reports/jmh/results.json")
 
-  jvmArgs = '-server -Xmx2G -XX:+UseG1GC -XX:-UseBiasedLocking'
-  warmupIterations = 10
+  jvmArgs = '-server -Xmx12G -XX:+UseG1GC -XX:-UseBiasedLocking'
+  warmupIterations = 5
   failOnError = true
-  iterations = 10
+  iterations = 5
   forceGC = true
   fork = 1
 }

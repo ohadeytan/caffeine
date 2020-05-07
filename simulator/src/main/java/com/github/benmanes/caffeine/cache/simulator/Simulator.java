@@ -22,6 +22,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import com.github.benmanes.caffeine.cache.simulator.parser.TraceFormat;
@@ -144,7 +145,7 @@ public final class Simulator extends AbstractActor {
     if (--remaining == 0) {
       reporter.print();
       context().stop(self());
-      System.out.println("Executed in " + stopwatch);
+      System.out.println("Executed in " + stopwatch.elapsed(TimeUnit.SECONDS));
     }
   }
 
