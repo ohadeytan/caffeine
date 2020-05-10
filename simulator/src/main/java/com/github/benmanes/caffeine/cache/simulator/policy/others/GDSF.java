@@ -45,7 +45,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
  * 
  * @author ohadey@gmail.com (Ohad Eytan)
  */
-public final class GDSF implements Policy {
+public class GDSF implements Policy {
   private final PolicyStats policyStats;
   private final long maximumSize;
 
@@ -91,60 +91,101 @@ public final class GDSF implements Policy {
     final int weight = event.weight();
     final long key = event.key();
     Node old = data.get(key);
-
-    if (old == null) { // miss
+    if (old == null) {
       policyStats.recordWeightedMiss(weight);
-      if (weight > maximumSize) {
-        policyStats.recordRejection();
-        return;
-      }
-      Node node = new Node(key, weight);
-      double p = priority(1, weight);
-      node.priority = p;
+      onMiss(key, weight);
+    } else {
+      policyStats.recordWeightedHit(weight);
+      onHit(old);
+    }
+  }
+
+  private void onHit(Node old) {
+    promote(old);
+  }
+
+  /**
+   * Update priority
+   */
+  protected void promote(Node old) {
+    old.frequency += 1;
+    priorityQueue.remove(new Pair<Double, Long>(old.priority, old.key));
+    old.priority = priority(old.frequency, old.weight);
+    priorityQueue.add(new Pair<Double, Long>(old.priority, old.key));
+  }
+
+  private void onMiss(final long key, final int weight) {
+    if (weight > maximumSize) {
+      policyStats.recordRejection();
+      return;
+    }
+    Node node = new Node(key, weight);
+    double p = priority(1, weight);
+    node.priority = p;
+    
+    if (used + weight <= maximumSize) {
       priorityQueue.add(new Pair<Double, Long>(p, key));
       data.put(key, node);
       used += weight;
-      if (used <= maximumSize) {
-        policyStats.recordAdmission();
-        return;
-      }
-      
-      ObjectBidirectionalIterator<Pair<Double, Long>> it = priorityQueue.iterator();
-      long victimsSize = 0;
-      Pair<Double, Long> pair = null;
-      while ((used - victimsSize) > maximumSize) {
-        pair = it.next();
-        long victimKey = pair.second().longValue();  
-        victimsSize += data.get(victimKey).weight;
-      }
-
-      if (pair.second().longValue() == key) {
-        used -= weight;
-        it.remove();;
-        data.remove(key);
-        policyStats.recordRejection();
-        checkState(used <= maximumSize);
-        return;
-      } 
-      
-      clock = pair.first();
-      while (used > maximumSize) {
-        it = priorityQueue.iterator();
-        long victim_key = it.next().second().longValue();
-        used -= data.get(victim_key).weight;
-        data.remove(victim_key);
-        it.remove();
-      }
       policyStats.recordAdmission();
-      checkState(used <= maximumSize);
-    } else { // hit
-      policyStats.recordWeightedHit(weight);
-      old.frequency += 1;
-      checkState(old.weight == weight);
-      checkState(priorityQueue.remove(new Pair<Double, Long>(old.priority, key)));
-      old.priority = priority(old.frequency, weight);
-      priorityQueue.add(new Pair<Double, Long>(old.priority, key));
+      return;
     }
+    
+    evict(node);
+  }
+
+  /**
+   */
+  protected void evict(Node candidate) {
+    ObjectBidirectionalIterator<Pair<Double, Long>> it = priorityQueue.iterator();
+    long victimsSize = 0;
+    Pair<Double, Long> pair = null;
+    while ((used + candidate.weight - victimsSize) > maximumSize) {
+      pair = it.next();
+      final double victimPriority = pair.first().doubleValue();
+      if (victimPriority > candidate.key) {
+        break;
+      }
+      final long victimKey = pair.second().longValue();
+      victimsSize += data.get(victimKey).weight;
+    }
+
+    if (pair.first().doubleValue() > candidate.priority) {
+      policyStats.recordRejection();
+      checkState(used <= maximumSize);
+      return;
+    } 
+
+    clock = pair.first();
+    admit(candidate);
+    while (used > maximumSize) {
+      evictVictim();
+    }
+    policyStats.recordAdmission();
+    checkState(used <= maximumSize);
+  }
+
+  /**
+   * @param candidate
+   * @param pair
+   */
+  protected void admit(Node candidate) {
+    priorityQueue.add(new Pair<Double, Long>(candidate.priority, candidate.key));
+    data.put(candidate.key, candidate);
+    used += candidate.weight;
+  }
+
+  /**
+   * Evicts the item with the minimal priority
+   */
+  protected void evictVictim() {
+    ObjectBidirectionalIterator<Pair<Double, Long>> it;
+    it = priorityQueue.iterator();
+    long victim_key = it.next().second().longValue();
+    used -= data.get(victim_key).weight;
+    data.remove(victim_key);
+    it.remove();
+    policyStats.recordEviction();
   }
   
   @Override
