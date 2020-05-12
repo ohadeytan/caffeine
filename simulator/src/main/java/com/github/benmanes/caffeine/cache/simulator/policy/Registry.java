@@ -44,7 +44,10 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.others.AvgGDSF;
+import com.github.benmanes.caffeine.cache.simulator.policy.others.CaffeineGDSF;
 import com.github.benmanes.caffeine.cache.simulator.policy.others.GDSF;
+import com.github.benmanes.caffeine.cache.simulator.policy.others.RistrettoGDSF;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.Cache2kPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.CaffeinePolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.product.CollisionPolicy;
@@ -202,5 +205,8 @@ public final class Registry {
   
   private static void registerOthers(Map<String, Function<Config, Set<Policy>>> factories) {
     factories.put("others.GDSF", GDSF::policies);
+    factories.put("others.AvgGDSF", AvgGDSF::policies);
+    factories.put("others.RistrettoGDSF", RistrettoGDSF::policies);
+    factories.put("others.CaffeineGDSF", CaffeineGDSF::policies);
   }
 }

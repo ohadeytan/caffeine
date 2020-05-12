@@ -46,14 +46,14 @@ import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
  * @author ohadey@gmail.com (Ohad Eytan)
  */
 public class GDSF implements Policy {
-  private final PolicyStats policyStats;
-  private final long maximumSize;
+  protected final PolicyStats policyStats;
+  protected final long maximumSize;
 
   final Long2ObjectMap<Node> data;
   final ObjectSortedSet<Pair<Double, Long>> priorityQueue;
   
-  private double clock;
-  private long used;
+  protected double clock;
+  protected long used;
   
   public GDSF(Config config) {
     BasicSettings settings = new BasicSettings(config);
@@ -178,14 +178,17 @@ public class GDSF implements Policy {
   /**
    * Evicts the item with the minimal priority
    */
-  protected void evictVictim() {
+  protected double evictVictim() {
     ObjectBidirectionalIterator<Pair<Double, Long>> it;
     it = priorityQueue.iterator();
-    long victim_key = it.next().second().longValue();
-    used -= data.get(victim_key).weight;
-    data.remove(victim_key);
+    Pair<Double, Long> pair = it.next();
+    final long victimKey = pair.second().longValue();
+    final double victimPriority = pair.first().doubleValue();
+    used -= data.get(victimKey).weight;
+    data.remove(victimKey);
     it.remove();
     policyStats.recordEviction();
+    return victimPriority;
   }
   
   @Override
