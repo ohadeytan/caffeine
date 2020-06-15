@@ -19,6 +19,8 @@ import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Charact
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toSet;
 
+import java.util.ArrayList;
+import java.util.Random;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
@@ -35,6 +37,7 @@ import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 /**
  * An adaption of the TinyLfu policy that adds a temporal admission window. This window allows the
@@ -53,54 +56,49 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public class SizedWindowTinyLfuPolicy implements Policy{
+public class SizedSampledTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
   protected final PolicyStats policyStats;
   protected final Frequency sketch;
   protected final long maximumSize;
   
   private final Node headWindow;
-  protected final Node headProbation;
-  protected final Node headProtected;
+  protected final LongArrayList main;
 
   protected final long maxWindow;
-  private final long maxProtected;
   protected final long maxMain;
-  protected final boolean scaled;
-  protected final boolean bump;
-  protected final boolean prune;  
+  protected final boolean prune;
+  protected final Sample sample;
 
   protected long sizeWindow;
-  private long sizeProtected;
+  protected long sizeMain;
   protected long sizeData;
   protected long victimsCount;
+  protected boolean scaled;
   
 
-  public SizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
+  public SizedSampledTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     this.sketch = new PeriodicResetCountMin4(settings.config());
     //this.sketch = new PerfectFrequency(settings.config());
-    this.scaled = settings.scaled();
-    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
-        + "WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
+    String name = String.format("sketch.sized." + "SampledTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
 
-    this.bump = settings.bump();
+    this.scaled = settings.scaled();
+    this.sample = Sample.valueOf(settings.sample());
     this.prune = settings.prune();
     this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
-    this.maxProtected = (long) (maxMain * settings.percentMainProtected());
     this.maxWindow = settings.maximumSizeLong() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
     this.maximumSize = settings.maximumSizeLong();
-    this.headProtected = new Node();
-    this.headProbation = new Node();
     this.headWindow = new Node();
+    this.main = new LongArrayList();
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
     SizedWindowTinyLfuSettings settings = new SizedWindowTinyLfuSettings(config);
     return settings.percentMain().stream()
-        .map(percentMain -> new SizedWindowTinyLfuPolicy(percentMain, settings))
+        .map(percentMain -> new SizedSampledTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
   }
 
@@ -125,11 +123,8 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     } else if (node.status == Status.WINDOW) {
       onWindowHit(node);
       policyStats.recordWeightedHit(weight);
-    } else if (node.status == Status.PROBATION) {
-      onProbationHit(node);
-      policyStats.recordWeightedHit(weight);
-    } else if (node.status == Status.PROTECTED) {
-      onProtectedHit(node);
+    } else if (node.status == Status.MAIN) {
+      onMainHit(node);
       policyStats.recordWeightedHit(weight);
     } else {
       throw new IllegalStateException();
@@ -165,28 +160,8 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     node.moveToTail(headWindow);
   }
 
-  /** Promotes the entry to the protected region's MRU position, demoting an entry if necessary. */
-  private void onProbationHit(Node node) {
+  private void onMainHit(Node node) {
     sketch.increment(node.key);
-
-    node.remove();
-    node.status = Status.PROTECTED;
-    node.appendToTail(headProtected);
-
-    sizeProtected += node.weight;
-    while (sizeProtected > maxProtected) {
-      Node demote = headProtected.next;
-      demote.remove();
-      demote.status = Status.PROBATION;
-      demote.appendToTail(headProbation);
-      sizeProtected -= demote.weight;
-    }
-  }
-
-  /** Moves the entry to the MRU position, if it falls outside of the fast-path threshold. */
-  private void onProtectedHit(Node node) {
-    sketch.increment(node.key);
-    node.moveToTail(headProtected);
   }
 
   /**
@@ -199,7 +174,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     while (headCandidates.prev != headCandidates) {
       Node candidate = headCandidates.prev;
       candidate.remove();
-      if ((sizeData + candidate.weight - sizeWindow) > maxMain) {
+      if ((sizeMain + candidate.weight) > maxMain) {
         coreEviction(candidate);
       } else {
         admit(candidate);
@@ -208,41 +183,23 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   }
   
   protected void coreEviction(Node candidate) {
-    Node victim = getVictim();
+    Node victim = getVictim((sizeMain + candidate.weight) - maxMain);
     victimsCount++;
     if (compare(sketch.frequency(candidate.key), candidate.weight, sketch.frequency(victim.key), victim.weight)) {
-      victimsCount--;
-      while ((sizeData + candidate.weight - sizeWindow) > maxMain) {
-        Node evict = getVictim();
+      evictNode(victim);
+      while ((sizeMain + candidate.weight) > maxMain) {
+        Node evict = getVictim((sizeMain + candidate.weight) - maxMain);
         victimsCount++;
         evictNode(evict);
       }
       admit(candidate);
     } else {
       reject(candidate);
-      if (bump) {
-        promote(getVictim());
-      }
+      main.add(victim.key);
     }    
   }
   
   protected void promote(Node node) {
-    if (node.status == Status.PROTECTED) {
-      node.moveToTail(headProtected);
-    } else if (node.status == Status.PROBATION) {
-      node.remove();
-      node.status = Status.PROTECTED;
-      node.appendToTail(headProtected);
-
-      sizeProtected += node.weight;
-      while (sizeProtected > maxProtected) {
-        Node demote = headProtected.next;
-        demote.remove();
-        demote.status = Status.PROBATION;
-        demote.appendToTail(headProbation);
-        sizeProtected -= demote.weight;
-      }
-    }
   }
 
   protected boolean compare(int candidateFreq, int candidateWeight, int victimFreq, int victimWeight) {
@@ -253,8 +210,9 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   }
   
   protected void admit(Node candidate) {
-    candidate.appendToTail(headProbation);
+    main.add(candidate.key);
     sizeData += candidate.weight;
+    sizeMain += candidate.weight;
     policyStats.recordAdmission();
   }
 
@@ -267,10 +225,9 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   protected void evictNode(Node evict) {
     data.remove(evict.key);
     sizeData -= evict.weight;
-    if (evict.status == Status.PROTECTED) {
-      sizeProtected -= evict.weight;
+    if (evict.status == Status.MAIN) {
+      sizeMain -= evict.weight;
     }
-    evict.remove();
     policyStats.recordEviction();    
   }
 
@@ -281,19 +238,89 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   private void collectCandidates(final Node headCandidates) {
     while (sizeWindow > maxWindow) {
       Node candidate = headWindow.next;
-      candidate.status = Status.PROBATION;
+      candidate.status = Status.MAIN;
       sizeWindow -= candidate.weight;
       sizeData -= candidate.weight;
       candidate.remove();
       candidate.appendToTail(headCandidates);
     }
   }
+
+  enum Sample {
+    Rand, Freq, Size, FreqToSize, SizeDist
+  }
   
-  protected Node getVictim() {
-    if (headProbation.next != headProbation) {
-      return headProbation.next;
+  protected Node getVictim(long placeNeeded) {
+    final int sample = 5;
+    int victimIndex = Integer.MIN_VALUE;
+    Node victimNode = null;
+    switch (this.sample) {
+    case Freq:
+      int minFreq = Integer.MAX_VALUE;
+      for (int i = 0; i < sample; i++) {
+        int index = new Random().nextInt(main.size());
+        Node node = data.get(main.getLong(index));
+        int freq = sketch.frequency(node.key);
+        if (freq < minFreq) {
+          minFreq = freq;
+          victimIndex = index;
+          victimNode = node;
+        }
+      }
+      break;
+    case Size:
+      int maxSize = Integer.MIN_VALUE;
+      for (int i = 0; i < sample; i++) {
+        int index = new Random().nextInt(main.size());
+        Node node = data.get(main.getLong(index));
+        int size = node.weight;
+        if (size > maxSize) {
+          maxSize = size;
+          victimIndex = index;
+          victimNode = node;
+        }
+      }
+      break;
+    case FreqToSize:
+      double minScore = Double.MAX_VALUE;
+      for (int i = 0; i < sample; i++) {
+        int index = new Random().nextInt(main.size());
+        Node node = data.get(main.getLong(index));
+        int freq = sketch.frequency(node.key);
+        double size = node.weight == 0 ? 0.001 : node.weight;
+        double score = (double) freq / size;
+        if (score < minScore) {
+          minScore = score;
+          victimIndex = index;
+          victimNode = node;
+        }
+      }
+      break;
+    case SizeDist:
+      int minDist = Integer.MAX_VALUE;
+      //int neededSlab = 32 - Integer.numberOfLeadingZeros((int) (placeNeeded - 1));
+      for (int i = 0; i < sample; i++) {
+        int index = new Random().nextInt(main.size());
+        Node node = data.get(main.getLong(index));
+        //int currentSlab = 32 - Integer.numberOfLeadingZeros(node.weight - 1);
+        //int dist = 2*Math.abs(neededSlab - currentSlab) - ((neededSlab - currentSlab) <= 0 ? 0 : 1);
+        int dist = (int) Math.abs(placeNeeded - node.weight);
+        if (dist < minDist) {
+          minDist = dist;
+          victimIndex = index;
+          victimNode = node;
+        }
+      }
+      break;
+    case Rand:
+    default:
+      victimIndex = new Random().nextInt(main.size());
+      victimNode = data.get(main.getLong(victimIndex));
+      break;
     }
-    return headProtected.next;
+    main.set(victimIndex, main.getLong(main.size()-1));
+    main.popLong();
+    return victimNode;
   }
 
 
@@ -301,18 +328,16 @@ public class SizedWindowTinyLfuPolicy implements Policy{
   public void finished() {
     System.out.println("victims_count=" + victimsCount);
     long windowSize = data.values().stream().filter(n -> n.status == Status.WINDOW).mapToLong(node -> node.weight).sum();
-    long probationSize = data.values().stream().filter(n -> n.status == Status.PROBATION).mapToLong(node -> node.weight).sum();
-    long protectedSize = data.values().stream().filter(n -> n.status == Status.PROTECTED).mapToLong(node -> node.weight).sum();
+    long mainSize = data.values().stream().filter(n -> n.status == Status.MAIN).mapToLong(node -> node.weight).sum();
 
-    checkState(windowSize <= sizeWindow);
-    checkState(protectedSize <= sizeProtected);
-    checkState(probationSize <= sizeData - windowSize - protectedSize);
-
+    checkState(windowSize == sizeWindow);
+    checkState(mainSize == (sizeData - windowSize));
+    checkState(mainSize == sizeMain);
     checkState(sizeData <= maximumSize);
   }
 
   enum Status {
-    WINDOW, PROBATION, PROTECTED
+    WINDOW, MAIN
   }
 
   /** A node on the double-linked list. */
@@ -326,7 +351,7 @@ public class SizedWindowTinyLfuPolicy implements Policy{
 
     /** Creates a new sentinel node. */
     public Node() {
-      this.key = Integer.MIN_VALUE;
+      this.key = Long.MIN_VALUE;
       this.weight = 0;
       this.prev = this;
       this.next = this;
@@ -391,6 +416,9 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     }
     public boolean prune() {
       return config().getBoolean("sized-window-tiny-lfu.prune");
+    }
+    public String sample() {
+      return config().getString("sized-window-tiny-lfu.sample").trim();
     }
   }
 }
