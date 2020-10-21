@@ -46,10 +46,10 @@ import net.autobuilder.AutoBuilder;
 public class PolicyStats {
   private final Map<String, Metric> metrics;
   private final Stopwatch stopwatch;
-  private final String name;
 
-  private long hitCount;
-  private long missCount;
+  private String name;
+  protected long hitCount;
+  protected long missCount;
   private long hitsWeight;
   private long missesWeight;
   private double hitPenalty;
