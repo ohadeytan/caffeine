@@ -25,12 +25,12 @@ import com.google.common.base.Stopwatch;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public final class PolicyStats {
+public class PolicyStats {
   private final Stopwatch stopwatch;
 
   private String name;
-  private long hitCount;
-  private long missCount;
+  protected long hitCount;
+  protected long missCount;
   private long hitsWeight;
   private long missesWeight;
   private double hitPenalty;
