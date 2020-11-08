@@ -83,6 +83,10 @@ public class BasicSettings {
   public long maximumSizeLong() {
     return config().getLong("maximum-size");
   }
+  
+  public List<Long> multilevelMaximumSize() {
+    return config().getLongList("maximum-size");
+  }
 
   public boolean isFiles() {
     return config().getString("source").equals("files");
