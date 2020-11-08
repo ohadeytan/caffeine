@@ -79,6 +79,10 @@ public class BasicSettings {
   public long maximumSize() {
     return config().getLong("maximum-size");
   }
+  
+  public List<Long> multilevelMaximumSize() {
+    return config().getLongList("maximum-size");
+  }
 
   public TraceSettings trace() {
     return new TraceSettings();

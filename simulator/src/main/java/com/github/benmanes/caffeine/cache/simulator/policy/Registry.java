@@ -48,6 +48,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.LinkedPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.MultiQueuePolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.MultilevelLinkedPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.others.AvgGDSF;
@@ -181,7 +182,14 @@ public final class Registry {
     registerMany(SegmentedLruPolicy.class, SegmentedLruPolicy::policies);
   }
 
-  private void registerSampled() {
+  private void registerMultilevel(Map<String, Function<Config, Set<Policy>>> factories) {
+    Stream.of(MultilevelLinkedPolicy.EvictionPolicy.values()).forEach(priority -> {
+      String id = "multi." + priority.name();
+      factories.put(id, config -> MultilevelLinkedPolicy.policies(config, priority));
+    });
+  }
+
+  private void registerSampled(Map<String, Function<Config, Set<Policy>>> factories) {
     Stream.of(SampledPolicy.EvictionPolicy.values()).forEach(priority -> {
       registerMany(priority.label(), SampledPolicy.class,
           config -> SampledPolicy.policies(config, priority));
