@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.benmanes.caffeine.cache.simulator.policy.multi;
+package com.github.benmanes.caffeine.cache.simulator.policy.sketch;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toSet;
@@ -26,10 +26,8 @@ import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy.KeyOnlyPolicy;
-import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.base.MoreObjects;
-import com.google.common.primitives.Ints;
 import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -52,7 +50,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
+public final class WindowTinyLfuPolicy implements KeyOnlyPolicy {
   private final Long2ObjectMap<Node> data;
   private final PolicyStats policyStats;
   private final Admittor admittor;
@@ -68,16 +66,16 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   private int sizeWindow;
   private int sizeProtected;
 
-  public BidiTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
+  public WindowTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
     String name = String.format("sketch.WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
     this.policyStats = new PolicyStats(name);
     this.admittor = new TinyLfu(settings.config(), policyStats);
-    this.maximumSize = Ints.checkedCast(settings.maximumSize());
 
-    int maxMain = (int) (maximumSize * percentMain);
+    int maxMain = (int) (settings.maximumSize() * percentMain);
     this.maxProtected = (int) (maxMain * settings.percentMainProtected());
+    this.maxWindow = settings.maximumSize() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maxWindow = maximumSize - maxMain;
+    this.maximumSize = settings.maximumSize();
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();
@@ -87,7 +85,7 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   public static Set<Policy> policies(Config config) {
     WindowTinyLfuSettings settings = new WindowTinyLfuSettings(config);
     return settings.percentMain().stream()
-        .map(percentMain -> new BidiTinyLfuPolicy(percentMain, settings))
+        .map(percentMain -> new WindowTinyLfuPolicy(percentMain, settings))
         .collect(toSet());
   }
 
