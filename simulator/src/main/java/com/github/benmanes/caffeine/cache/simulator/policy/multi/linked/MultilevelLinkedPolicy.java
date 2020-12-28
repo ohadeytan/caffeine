@@ -58,6 +58,7 @@ public final class MultilevelLinkedPolicy implements Policy {
   final long[] maximumSize;
   final Node[] sentinels;
   long[] currentSizes;
+  long levelTwoWrites;
   final static boolean debug = false;
   final static boolean stats = true;
   
@@ -111,6 +112,9 @@ public final class MultilevelLinkedPolicy implements Policy {
             candidate.moveToTail();
             continue;
           }
+          if (level == 1) {
+            levelTwoWrites++;
+          }
           data.put(candidate.key, candidate);
           currentSizes[level] += candidate.weight;
           candidate.sentinel = sentinels[level];
@@ -158,12 +162,13 @@ public final class MultilevelLinkedPolicy implements Policy {
   public void finished() {
     printCache();
     if (stats) {
-      System.out.println("level, hits, misses");
-      for (int level = 0; level < levels; level++) {
-        System.out.println(level + ", " + policyStats.hitCount(level) + ", " + policyStats.missCount(level));
-      }
+      System.out.println("level_1_hits=" + policyStats.hitCount(0));
+      System.out.println("level_1_misses=" + policyStats.missCount(0));
+      System.out.println("level_2_hits=" + policyStats.hitCount(1));
+      System.out.println("level_2_misses=" + policyStats.missCount(1));
+      System.out.println("level_2_writes=" + levelTwoWrites);
+      System.out.println("level_2_promotions=" + 0);
     }
-
   }
 
   private void evictEntry(Node node, int level, Node headCandidate) {

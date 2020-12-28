@@ -17,6 +17,7 @@ package com.github.benmanes.caffeine.cache.simulator.policy.multi;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toSet;
+import com.typesafe.config.ConfigFactory;
 
 import java.util.List;
 import java.util.Set;
@@ -24,6 +25,7 @@ import java.util.Set;
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.admission.TinyLfu;
+import com.github.benmanes.caffeine.cache.simulator.policy.MultilevelPolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy.KeyOnlyPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
@@ -54,33 +56,55 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  */
 public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   private final Long2ObjectMap<Node> data;
-  private final PolicyStats policyStats;
+  private final MultilevelPolicyStats policyStats;
   private final Admittor admittor;
-  private final int maximumSize;
+  private final long maximumSizeFirst;
+  private final long maximumSizeSecond;
 
   private final Node headWindow;
   private final Node headProbation;
   private final Node headProtected;
+  private final Node headVeterans;
+  
+  private final long maxWindow;
+  private final long maxVeterans;
+  private final long maxProtected;
 
-  private final int maxWindow;
-  private final int maxProtected;
+  private long sizeWindow;
+  private long sizeVeterans;
+  private long sizeProtected;
+  private long sizeProbation;
 
-  private int sizeWindow;
-  private int sizeProtected;
+  private long levelOneMisses;
+  private long levelTwoMisses;
+  private long levelOneHits;
+  private long levelTwoHits;
+  private long levelTwoEvictions;
+  private long levelTwoPromotions;
+  private long windowHits;
+  private long veteransHits;
 
-  public BidiTinyLfuPolicy(double percentMain, WindowTinyLfuSettings settings) {
-    String name = String.format("sketch.WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
-    this.policyStats = new PolicyStats(name);
-    this.admittor = new TinyLfu(settings.config(), policyStats);
-    this.maximumSize = Ints.checkedCast(settings.maximumSize());
+  private final boolean stats = true;
 
-    int maxMain = (int) (maximumSize * percentMain);
-    this.maxProtected = (int) (maxMain * settings.percentMainProtected());
+  public BidiTinyLfuPolicy(double percentVeterans, WindowTinyLfuSettings settings) {
+    String name = String.format("multi.BidiTinyLfu (%.0f%%)", 100 * (1.0d - percentVeterans));
+    this.policyStats = new MultilevelPolicyStats(name, 2);
+
+    List<Long> maximums= settings.multilevelMaximumSize();
+    this.maximumSizeFirst = maximums.get(0);
+    this.maximumSizeSecond = maximums.get(1);
+
+    this.admittor = new TinyLfu(ConfigFactory.parseString("maximum-size = " + maximumSizeSecond).withFallback(settings.config()), policyStats);
+    
+    this.maxVeterans = (long) (maximumSizeFirst * percentVeterans);
+    this.maxWindow = maximumSizeFirst - maxVeterans;
+    this.maxProtected = (long) (maximumSizeSecond * settings.percentMainProtected());
+
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maxWindow = maximumSize - maxMain;
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();
+    this.headVeterans = new Node();
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
@@ -99,19 +123,33 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   @Override
   public void record(long key) {
     policyStats.recordOperation();
+    admittor.record(key);
     Node node = data.get(key);
     if (node == null) {
       onMiss(key);
       policyStats.recordMiss();
+      levelOneMisses++;
+      levelTwoMisses++;
     } else if (node.status == Status.WINDOW) {
       onWindowHit(node);
       policyStats.recordHit();
+      levelOneHits++;
+      windowHits++;
+    } else if (node.status == Status.VETERAN) {
+      onVeteranHit(node);
+      policyStats.recordHit();
+      levelOneHits++;
+      veteransHits++;
     } else if (node.status == Status.PROBATION) {
       onProbationHit(node);
       policyStats.recordHit();
+      levelOneMisses++;
+      levelTwoHits++;
     } else if (node.status == Status.PROTECTED) {
       onProtectedHit(node);
       policyStats.recordHit();
+      levelOneMisses++;
+      levelTwoHits++;
     } else {
       throw new IllegalStateException();
     }
@@ -119,8 +157,6 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
 
   /** Adds the entry to the admission window, evicting if necessary. */
   private void onMiss(long key) {
-    admittor.record(key);
-
     Node node = new Node(key, Status.WINDOW);
     node.appendToTail(headWindow);
     data.put(key, node);
@@ -128,33 +164,61 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
     evict();
   }
 
+  /** Moves the entry to the MRU position in the veterans part. */
+  private void onVeteranHit(Node node) {
+    node.moveToTail(headVeterans);    
+  }
+
   /** Moves the entry to the MRU position in the admission window. */
   private void onWindowHit(Node node) {
-    admittor.record(node.key);
     node.moveToTail(headWindow);
   }
 
+  private boolean promote(Node node) {
+    Node victim = headVeterans.next;
+    if (admittor.admit(node.key, victim.key)) {
+      if (node.status == Status.PROTECTED) {
+        sizeProbation++;
+        sizeProtected--;
+      }
+      node.remove();
+      node.status = Status.VETERAN;
+      node.appendToTail(headVeterans);      
+      victim.remove();
+      victim.status = Status.PROBATION;
+      victim.appendToTail(headProbation);
+      levelTwoPromotions++;
+      return true;
+    }
+    return false;
+  }
+  
   /** Promotes the entry to the protected region's MRU position, demoting an entry if necessary. */
   private void onProbationHit(Node node) {
-    admittor.record(node.key);
-
+    if (promote(node)) {
+      return;
+    } 
     node.remove();
     node.status = Status.PROTECTED;
     node.appendToTail(headProtected);
 
+    sizeProbation--;
     sizeProtected++;
     if (sizeProtected > maxProtected) {
       Node demote = headProtected.next;
       demote.remove();
       demote.status = Status.PROBATION;
       demote.appendToTail(headProbation);
+      sizeProbation++;
       sizeProtected--;
     }
   }
 
   /** Moves the entry to the MRU position, if it falls outside of the fast-path threshold. */
   private void onProtectedHit(Node node) {
-    admittor.record(node.key);
+    if (promote(node)) {
+      return;
+    }
     node.moveToTail(headProtected);
   }
 
@@ -168,37 +232,61 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
     }
 
     Node candidate = headWindow.next;
+    candidate.remove();
     sizeWindow--;
 
-    candidate.remove();
+    if (sizeVeterans < maxVeterans) {
+      candidate.status = Status.VETERAN;
+      candidate.appendToTail(headVeterans);
+      sizeVeterans++;
+      return;
+    }
+    
     candidate.status = Status.PROBATION;
     candidate.appendToTail(headProbation);
 
-    if (data.size() > maximumSize) {
+    if ((sizeProbation + sizeProtected) == maximumSizeSecond) {
       Node victim = headProbation.next;
       Node evict = admittor.admit(candidate.key, victim.key) ? victim : candidate;
+      if (victim.key == evict.key) {
+        levelTwoEvictions++;
+      }
       data.remove(evict.key);
       evict.remove();
-
       policyStats.recordEviction();
+    } else {
+      sizeProbation++;
     }
   }
 
   @Override
   public void finished() {
     long windowSize = data.values().stream().filter(n -> n.status == Status.WINDOW).count();
+    long veteransSize = data.values().stream().filter(n -> n.status == Status.VETERAN).count();
     long probationSize = data.values().stream().filter(n -> n.status == Status.PROBATION).count();
     long protectedSize = data.values().stream().filter(n -> n.status == Status.PROTECTED).count();
 
     checkState(windowSize == sizeWindow);
     checkState(protectedSize == sizeProtected);
-    checkState(probationSize == data.size() - windowSize - protectedSize);
+    checkState(probationSize == sizeProbation);
+    checkState(veteransSize == sizeVeterans);
 
-    checkState(data.size() <= maximumSize);
+    checkState(data.size() <= (maximumSizeFirst + maximumSizeSecond));
+
+    if (stats) {
+      System.out.println("level_1_hits=" + levelOneHits);
+      System.out.println("level_1_misses=" + levelOneMisses);
+      System.out.println("level_2_hits=" + levelTwoHits);
+      System.out.println("level_2_misses=" + levelTwoMisses);
+      System.out.println("level_2_evictions=" + levelTwoEvictions);
+      System.out.println("level_2_promotions=" + levelTwoPromotions);
+      System.out.println("window_hits=" + windowHits);
+      System.out.println("veterans_hits=" + veteransHits);
+    }
   }
 
   enum Status {
-    WINDOW, PROBATION, PROTECTED
+    WINDOW, PROBATION, PROTECTED, VETERAN
   }
 
   /** A node on the double-linked list. */

@@ -49,6 +49,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.MultiQueuePoli
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.MultilevelLinkedPolicy;
+import com.github.benmanes.caffeine.cache.simulator.policy.multi.BidiTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.others.AvgGDSF;
@@ -187,6 +188,7 @@ public final class Registry {
       String id = "multi." + priority.name();
       factories.put(id, config -> MultilevelLinkedPolicy.policies(config, priority));
     });
+    factories.put("multi.BidiTinyLfu", BidiTinyLfuPolicy::policies);
   }
 
   private void registerSampled(Map<String, Function<Config, Set<Policy>>> factories) {
