@@ -24,6 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import com.github.benmanes.caffeine.cache.simulator.parser.adapt_size.AdaptSizeTraceReader;
+import com.github.benmanes.caffeine.cache.simulator.parser.adapt_size.AdaptSizeChunked;
 import com.github.benmanes.caffeine.cache.simulator.parser.address.AddressTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.address.penalties.AddressPenaltiesTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.arc.ArcTraceReader;
@@ -62,6 +63,7 @@ public enum TraceFormat {
   ADDRESS(AddressTraceReader::new),
   ADDRESS_PENALTIES(AddressPenaltiesTraceReader::new),
   ADAPT_SIZE(AdaptSizeTraceReader::new),
+  ADAPT_SIZE_CHUNKED(AdaptSizeChunked::new),
   ARC(ArcTraceReader::new),
   CACHE2K(Cache2kTraceReader::new),
   CAMELAB(CamelabTraceReader::new),
