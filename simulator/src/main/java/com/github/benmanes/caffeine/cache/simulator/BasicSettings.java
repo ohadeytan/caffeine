@@ -132,6 +132,9 @@ public class BasicSettings {
     public boolean lazy() {
       return config().getBoolean("tiny-lfu.count-min.lazy");
     }
+    public boolean tiebreaker() {
+      return config().getBoolean("tiny-lfu.tiebreaker");
+    }
     public CountMin4Settings countMin4() {
       return new CountMin4Settings();
     }

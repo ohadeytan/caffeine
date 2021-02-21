@@ -36,10 +36,13 @@ import com.typesafe.config.Config;
 public final class TinyLfu implements KeyOnlyAdmittor {
   private final PolicyStats policyStats;
   private final Frequency sketch;
+  private final boolean tiebreaker;
 
   public TinyLfu(Config config, PolicyStats policyStats) {
     this.policyStats = policyStats;
     this.sketch = makeSketch(config);
+    BasicSettings settings = new BasicSettings(config);
+    this.tiebreaker = settings.tinyLfu().tiebreaker();
   }
 
   private Frequency makeSketch(Config config) {
@@ -83,7 +86,7 @@ public final class TinyLfu implements KeyOnlyAdmittor {
 
     long candidateFreq = sketch.frequency(candidateKey);
     long victimFreq = sketch.frequency(victimKey);
-    if (candidateFreq > victimFreq) {
+    if (candidateFreq > victimFreq || (tiebreaker && candidateFreq == victimFreq)) {
       policyStats.recordAdmission();
       return true;
     }
