@@ -176,6 +176,9 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
 
   private boolean promote(Node node) {
     Node victim = headVeterans.next;
+    if (victim == headVeterans) {
+      return false;
+    }
     if (admittor.admit(node.key, victim.key)) {
       if (node.status == Status.PROTECTED) {
         sizeProbation++;
