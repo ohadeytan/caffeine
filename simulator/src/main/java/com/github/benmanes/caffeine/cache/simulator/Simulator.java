@@ -40,7 +40,8 @@ import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.Registry;
 import com.github.benmanes.caffeine.cache.simulator.report.Reporter;
 import com.google.common.base.Stopwatch;
-import com.typesafe.config.Config;
+import com.google.common.collect.Iterators;
+import com.typesafe.config.*;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
@@ -166,6 +167,7 @@ public final class Simulator extends AbstractActor {
   }
 
   public static void main(String[] args) {
+    confFile = args[0];
     akka.Main.main(new String[] { Simulator.class.getName() } );
   }
 }
