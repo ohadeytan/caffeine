@@ -16,14 +16,20 @@
 package com.github.benmanes.caffeine.cache;
 
 import static com.github.benmanes.caffeine.cache.Specifications.BOUNDED_LOCAL_CACHE;
+import static com.github.benmanes.caffeine.cache.Specifications.BUILDER;
 import static com.github.benmanes.caffeine.cache.Specifications.BUILDER_PARAM;
+import static com.github.benmanes.caffeine.cache.Specifications.CACHE_LOADER;
 import static com.github.benmanes.caffeine.cache.Specifications.CACHE_LOADER_PARAM;
 import static com.github.benmanes.caffeine.cache.Specifications.kTypeVar;
 import static com.github.benmanes.caffeine.cache.Specifications.vTypeVar;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Year;
@@ -35,6 +41,7 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import javax.lang.model.element.Modifier;
 
@@ -48,9 +55,9 @@ import com.github.benmanes.caffeine.cache.local.AddExpireAfterWrite;
 import com.github.benmanes.caffeine.cache.local.AddFastPath;
 import com.github.benmanes.caffeine.cache.local.AddKeyValueStrength;
 import com.github.benmanes.caffeine.cache.local.AddMaximum;
+import com.github.benmanes.caffeine.cache.local.AddPacer;
 import com.github.benmanes.caffeine.cache.local.AddRefreshAfterWrite;
 import com.github.benmanes.caffeine.cache.local.AddRemovalListener;
-import com.github.benmanes.caffeine.cache.local.AddPacer;
 import com.github.benmanes.caffeine.cache.local.AddStats;
 import com.github.benmanes.caffeine.cache.local.AddSubtype;
 import com.github.benmanes.caffeine.cache.local.AddWriteBuffer;
@@ -63,6 +70,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
+import com.google.googlejavaformat.java.Formatter;
+import com.google.googlejavaformat.java.FormatterException;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
@@ -77,6 +86,16 @@ import com.squareup.javapoet.TypeSpec;
  * @author ben.manes@gmail.com (Ben Manes)
  */
 public final class LocalCacheFactoryGenerator {
+  static final FieldSpec LOOKUP = FieldSpec.builder(MethodHandles.Lookup.class, "LOOKUP")
+      .initializer("$T.lookup()", MethodHandles.class)
+      .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+      .build();
+  static final FieldSpec FACTORY = FieldSpec.builder(MethodType.class, "FACTORY")
+      .initializer("$T.methodType($T.class, $T.class, $T.class, $T.class)",
+          MethodType.class, void.class, BUILDER, CACHE_LOADER.rawType, TypeName.BOOLEAN)
+      .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+      .build();
+
   final Feature[] featureByIndex = { null, null, Feature.LISTENING, Feature.STATS,
       Feature.MAXIMUM_SIZE, Feature.MAXIMUM_WEIGHT, Feature.EXPIRE_ACCESS,
       Feature.EXPIRE_WRITE, Feature.REFRESH_WRITE};
@@ -108,6 +127,7 @@ public final class LocalCacheFactoryGenerator {
     generateLocalCaches();
     addFactoryMethods();
     writeJavaFile();
+    reformat();
   }
 
   private void addFactoryMethods() {
@@ -134,10 +154,26 @@ public final class LocalCacheFactoryGenerator {
 
     for (TypeSpec typeSpec : factoryTypes) {
       JavaFile.builder(getClass().getPackage().getName(), typeSpec)
-              .addFileComment(header, Year.now(timeZone))
-              .indent("  ")
-              .build()
-              .writeTo(directory);
+          .addFileComment(header, Year.now(timeZone))
+          .indent("  ")
+          .build()
+          .writeTo(directory);
+    }
+  }
+
+  private void reformat() throws IOException {
+    try (Stream<Path> stream = Files.walk(directory)) {
+      List<Path> files = stream
+          .filter(path -> path.toString().endsWith(".java"))
+          .collect(toList());
+      Formatter formatter = new Formatter();
+      for (Path file : files) {
+        String source = Files.readString(file);
+        String formatted = formatter.formatSourceAndFixImports(source);
+        Files.writeString(file, formatted);
+      }
+    } catch (FormatterException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -160,6 +196,9 @@ public final class LocalCacheFactoryGenerator {
               .initializer("$S", constant)
               .build());
     }
+
+    factory.addField(FACTORY);
+    factory.addField(LOOKUP);
   }
 
   private void generateLocalCaches() {

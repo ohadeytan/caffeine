@@ -15,17 +15,15 @@
  */
 package com.github.benmanes.caffeine.cache.simulator.parser.kaggle;
 
-import java.io.IOException;
 import java.util.stream.LongStream;
 
 import com.github.benmanes.caffeine.cache.simulator.parser.TextTraceReader;
 import com.github.benmanes.caffeine.cache.simulator.parser.TraceReader.KeyOnlyTraceReader;
-import com.google.common.hash.Hashing;
 
 /**
  * A reader for the page views log provided by
  * <a href="https://www.kaggle.com/c/outbrain-click-prediction/data">Outbrain</a>.
- * Notice: you should reorder the file according to the timestamp, e.g. by 
+ * Notice: you should reorder the file according to the timestamp, e.g. by
  * {@code sort -t, -k 3,3n -s page_views_sample.csv > page_views_sample_sorted.csv}
  *
  * @author ohadey@gmail.com (Ohad Eytan)
@@ -37,7 +35,7 @@ public final class OutbrainTraceReader extends TextTraceReader implements KeyOnl
   }
 
   @Override
-  public LongStream keys() throws IOException {
+  public LongStream keys() {
     return lines().skip(1)
         .map(line -> line.split(","))
         .mapToLong(array -> Long.parseLong(array[1]));

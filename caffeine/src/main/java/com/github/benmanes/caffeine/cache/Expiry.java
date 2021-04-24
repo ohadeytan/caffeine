@@ -16,7 +16,6 @@
 package com.github.benmanes.caffeine.cache;
 
 import org.checkerframework.checker.index.qual.NonNegative;
-import org.checkerframework.checker.nullness.qual.NonNull;
 
 /**
  * Calculates when cache entries expire. A single expiration time is retained so that the lifetime
@@ -24,7 +23,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-public interface Expiry<K, V> {
+public interface Expiry<K extends Object, V extends Object> {
 
   /**
    * Specifies that the entry should be automatically removed from the cache once the duration has
@@ -40,7 +39,7 @@ public interface Expiry<K, V> {
    * @param currentTime the current time, in nanoseconds
    * @return the length of time before the entry expires, in nanoseconds
    */
-  long expireAfterCreate(@NonNull K key, @NonNull V value, long currentTime);
+  long expireAfterCreate(K key, V value, long currentTime);
 
   /**
    * Specifies that the entry should be automatically removed from the cache once the duration has
@@ -58,8 +57,7 @@ public interface Expiry<K, V> {
    * @param currentDuration the current duration, in nanoseconds
    * @return the length of time before the entry expires, in nanoseconds
    */
-  long expireAfterUpdate(@NonNull K key, @NonNull V value,
-      long currentTime, @NonNegative long currentDuration);
+  long expireAfterUpdate(K key, V value, long currentTime, @NonNegative long currentDuration);
 
   /**
    * Specifies that the entry should be automatically removed from the cache once the duration has
@@ -77,6 +75,5 @@ public interface Expiry<K, V> {
    * @param currentDuration the current duration, in nanoseconds
    * @return the length of time before the entry expires, in nanoseconds
    */
-  long expireAfterRead(@NonNull K key, @NonNull V value,
-      long currentTime, @NonNegative long currentDuration);
+  long expireAfterRead(K key, V value, long currentTime, @NonNegative long currentDuration);
 }

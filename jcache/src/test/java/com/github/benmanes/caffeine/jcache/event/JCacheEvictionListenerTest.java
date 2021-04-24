@@ -31,6 +31,7 @@ import javax.cache.event.CacheEntryRemovedListener;
 
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -47,12 +48,13 @@ public final class JCacheEvictionListenerTest {
   JCacheEvictionListener<Integer, Integer> listener;
   JCacheStatisticsMXBean statistics;
 
-  @Mock Cache<Integer, Integer> cache;
   @Mock EvictionListener entryListener;
+  @Mock Cache<Integer, Integer> cache;
+  AutoCloseable mocks;
 
   @BeforeMethod
   public void before() {
-    MockitoAnnotations.initMocks(this);
+    mocks = MockitoAnnotations.openMocks(this);
     statistics = new JCacheStatisticsMXBean();
     EventDispatcher<Integer, Integer> dispatcher =
         new EventDispatcher<>(MoreExecutors.directExecutor());
@@ -64,16 +66,22 @@ public final class JCacheEvictionListenerTest {
         () -> entryListener, null, false, false));
   }
 
+  @AfterMethod
+  public void afterMethod() throws Exception {
+    mocks.close();
+  }
+
   @DataProvider
   public Iterator<Object[]> notifications() {
     return Arrays.stream(RemovalCause.values())
+        .filter(RemovalCause::wasEvicted)
         .map(cause -> new Object[] { 1, new Expirable<>(2, 3), cause })
         .iterator();
   }
 
   @Test(dataProvider = "notifications")
   public void publishIfEvicted(Integer key, Expirable<Integer> value, RemovalCause cause) {
-    listener.delete(key, value, cause);
+    listener.onRemoval(key, value, cause);
 
     if (cause.wasEvicted()) {
       if (cause == RemovalCause.EXPIRED) {
