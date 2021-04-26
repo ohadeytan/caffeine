@@ -38,8 +38,8 @@ public class SimpleClimber extends AbstractClimber {
 
   public SimpleClimber(Config config) {
     SimpleClimberSettings settings = new SimpleClimberSettings(config);
-    this.initialSampleSize = (long) (settings.percentSample() * settings.maximumSizeLong());
-    this.initialStepSize = settings.percentPivot() * settings.maximumSizeLong();
+    this.initialSampleSize = (long) (settings.percentSample() * settings.maximumSize());
+    this.initialStepSize = settings.percentPivot() * settings.maximumSize();
     this.restartThreshold = settings.restartThreshold();
     this.sampleDecayRate = settings.sampleDecayRate();
     this.stepDecayRate = settings.stepDecayRate();

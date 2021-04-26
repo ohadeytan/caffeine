@@ -35,13 +35,13 @@ import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.Adaptation;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber.QueueType;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimber;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberType;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -54,6 +54,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  * @author ben.manes@gmail.com (Ben Manes)
  */
 @SuppressWarnings("PMD.TooManyFields")
+@PolicySpec(name = "sketch.sized.HillClimberWindowTinyLfu", characteristics = WEIGHTED)
 public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   protected final double initialPercentMain;
   protected final HillClimberType strategy;
@@ -81,11 +82,11 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   public SizedHillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,
       HillClimberWindowTinyLfuSettings settings) {
 
-    long maxMain = (long) (settings.maximumSizeLong() * percentMain);
+    long maxMain = (long) (settings.maximumSize() * percentMain);
     this.maxProtected = (long) (maxMain * settings.percentMainProtected());
-    this.maxWindow = settings.maximumSizeLong() - maxMain;
+    this.maxWindow = settings.maximumSize() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSizeLong();
+    this.maximumSize = settings.maximumSize();
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();
@@ -121,12 +122,6 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
   @Override
   public PolicyStats stats() {
     return policyStats;
-  }
-
-
-  @Override 
-  public Set<Characteristic> characteristics() {
-    return Sets.immutableEnumSet(WEIGHTED);
   }
   
   @Override
@@ -347,7 +342,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("+%,d (%,d -> %,d)%n", (long) quota, maxWindow - (long) quota, maxWindow);
+      System.out.printf("+%,d (%,d -> %,d)%n", quota, maxWindow - quota, maxWindow);
     }
   }
 
@@ -379,7 +374,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     checkState(windowSize <= maxWindow);
 
     if (trace) {
-      System.out.printf("-%,d (%,d -> %,d)%n", (long) quota, maxWindow + (long) quota, maxWindow);
+      System.out.printf("-%,d (%,d -> %,d)%n", quota, maxWindow + quota, maxWindow);
     }
   }
 
@@ -392,7 +387,7 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
 
   @Override
   public void finished() {    
-    policyStats.setName(getPolicyName());
+    // policyStats.setName(getPolicyName());
     printSegmentSizes();
 
     long actualWindowSize = data.values().stream().filter(n -> n.queue == WINDOW).mapToLong(node -> node.weight).sum();
@@ -400,10 +395,10 @@ public class SizedHillClimberWindowTinyLfuPolicy implements Policy {
     long actualProtectedSize = data.values().stream().filter(n -> n.queue == PROTECTED).mapToLong(node -> node.weight).sum();
     long calculatedProbationSize = sizeData - actualWindowSize - actualProtectedSize;
 
-    checkState((long) windowSize == actualWindowSize,
-        "Window: %s != %s", (long) windowSize, actualWindowSize);
-    checkState((long) protectedSize == actualProtectedSize,
-        "Protected: %s != %s", (long) protectedSize, actualProtectedSize);
+    checkState( windowSize == actualWindowSize,
+        "Window: %s != %s",  windowSize, actualWindowSize);
+    checkState( protectedSize == actualProtectedSize,
+        "Protected: %s != %s",  protectedSize, actualProtectedSize);
     checkState(actualProbationSize == calculatedProbationSize,
         "Probation: %s != %s", actualProbationSize, calculatedProbationSize);
     checkState(sizeData <= maximumSize, "Maximum: %s > %s", sizeData, maximumSize);

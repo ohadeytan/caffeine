@@ -22,12 +22,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.HillClimberType;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.SizedHillClimberWindowTinyLfuPolicy.HillClimberWindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.climbing.sized.SizedHillClimberWindowTinyLfuPolicy.Node;
 import com.typesafe.config.Config;
 
+@PolicySpec(name = "sketch.sized.RistrettoHillClimberWindowTinyLfu")
 public final class RistrettoSizedHillClimberWindowTinyLfuPolicy extends SizedHillClimberWindowTinyLfuPolicy {
 
   public RistrettoSizedHillClimberWindowTinyLfuPolicy(HillClimberType strategy, double percentMain,

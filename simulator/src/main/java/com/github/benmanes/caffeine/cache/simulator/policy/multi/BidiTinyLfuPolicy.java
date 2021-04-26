@@ -54,9 +54,10 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
+@PolicySpec(name = "multi.BidiTinyLfu")
 public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   private final Long2ObjectMap<Node> data;
-  private final MultilevelPolicyStats policyStats;
+  private final PolicyStats policyStats;
   private final Admittor admittor;
   private final long maximumSizeFirst;
   private final long maximumSizeSecond;
@@ -87,8 +88,7 @@ public final class BidiTinyLfuPolicy implements KeyOnlyPolicy {
   private final boolean stats = true;
 
   public BidiTinyLfuPolicy(double percentVeterans, WindowTinyLfuSettings settings) {
-    String name = String.format("multi.BidiTinyLfu (%.0f%%)", 100 * (1.0d - percentVeterans));
-    this.policyStats = new MultilevelPolicyStats(name, 2);
+    this.policyStats = new MultilevelPolicyStats(name(), 2, "(%.0f%%)", 100 * (1.0d - percentVeterans));
 
     List<Long> maximums= settings.multilevelMaximumSize();
     this.maximumSizeFirst = maximums.get(0);

@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.github.benmanes.caffeine.cache.Scheduler;
 
-import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
-
 /**
  * @author ben.manes@gmail.com (Ben Manes)
  */

@@ -20,16 +20,15 @@ import static java.util.stream.Collectors.toSet;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.typesafe.config.Config;
 
+@PolicySpec(name = "sketch.sized.RistrettoWindowTinyLfu")
 public final class RistrettoSizedWindowTinyLfuPolicy extends SizedWindowTinyLfuPolicy {
 
   public RistrettoSizedWindowTinyLfuPolicy(double percentMain, SizedWindowTinyLfuSettings settings) {
     super(percentMain, settings);
-    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
-        + "RistrettoWindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
-    policyStats.setName(name);
   }
   
   /** Returns all variations of this policy based on the configuration parameters. */

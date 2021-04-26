@@ -19,20 +19,17 @@ import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Charact
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toSet;
 
-import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
-import com.github.benmanes.caffeine.cache.simulator.admission.countmin64.CountMin64TinyLfu;
-import com.github.benmanes.caffeine.cache.simulator.admission.perfect.PerfectFrequency;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -56,6 +53,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
+@PolicySpec(characteristics = WEIGHTED)
 public class SizedSampledTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
   protected final PolicyStats policyStats;
@@ -86,10 +84,10 @@ public class SizedSampledTinyLfuPolicy implements Policy{
     this.scaled = settings.scaled();
     this.sample = Sample.valueOf(settings.sample());
     this.prune = settings.prune();
-    this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
-    this.maxWindow = settings.maximumSizeLong() - maxMain;
+    this.maxMain = (long) (settings.maximumSize() * percentMain);
+    this.maxWindow = settings.maximumSize() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSizeLong();
+    this.maximumSize = settings.maximumSize();
     this.headWindow = new Node();
     this.main = new LongArrayList();
   }
@@ -107,10 +105,6 @@ public class SizedSampledTinyLfuPolicy implements Policy{
     return policyStats;
   }
 
-  @Override public Set<Characteristic> characteristics() {
-    return Sets.immutableEnumSet(WEIGHTED);
-  }
-  
   @Override
   public void record(AccessEvent event) {
     final long key = event.key();

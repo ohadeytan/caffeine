@@ -86,3 +86,4 @@
     <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
   </Match>
 </FindBugsFilter>
+

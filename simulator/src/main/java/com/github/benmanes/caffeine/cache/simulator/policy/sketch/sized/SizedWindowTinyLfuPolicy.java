@@ -24,13 +24,11 @@ import java.util.Set;
 import com.github.benmanes.caffeine.cache.simulator.policy.sketch.WindowTinyLfuPolicy.WindowTinyLfuSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Frequency;
 import com.github.benmanes.caffeine.cache.simulator.admission.countmin4.PeriodicResetCountMin4;
-import com.github.benmanes.caffeine.cache.simulator.admission.countmin64.CountMin64TinyLfu;
-import com.github.benmanes.caffeine.cache.simulator.admission.perfect.PerfectFrequency;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -53,6 +51,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
+@PolicySpec(name = "sketch.sized.WindowTinyLfu", characteristics = WEIGHTED)
 public class SizedWindowTinyLfuPolicy implements Policy{
   private final Long2ObjectMap<Node> data;
   protected final PolicyStats policyStats;
@@ -80,17 +79,15 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     this.sketch = new PeriodicResetCountMin4(settings.config());
     //this.sketch = new PerfectFrequency(settings.config());
     this.scaled = settings.scaled();
-    String name = String.format("sketch.sized." + (scaled ? "Scaled" : "") 
-        + "WindowTinyLfu (%.0f%%)", 100 * (1.0d - percentMain));
-    this.policyStats = new PolicyStats(name);
+    this.policyStats = new PolicyStats(name() + (scaled ? ".Scaled" : ""),  "(%.0f%%)", 100 * (1.0d - percentMain));
 
     this.bump = settings.bump();
     this.prune = settings.prune();
-    this.maxMain = (long) (settings.maximumSizeLong() * percentMain);
+    this.maxMain = (long) (settings.maximumSize() * percentMain);
     this.maxProtected = (long) (maxMain * settings.percentMainProtected());
-    this.maxWindow = settings.maximumSizeLong() - maxMain;
+    this.maxWindow = settings.maximumSize() - maxMain;
     this.data = new Long2ObjectOpenHashMap<>();
-    this.maximumSize = settings.maximumSizeLong();
+    this.maximumSize = settings.maximumSize();
     this.headProtected = new Node();
     this.headProbation = new Node();
     this.headWindow = new Node();
@@ -109,10 +106,6 @@ public class SizedWindowTinyLfuPolicy implements Policy{
     return policyStats;
   }
 
-  @Override public Set<Characteristic> characteristics() {
-    return Sets.immutableEnumSet(WEIGHTED);
-  }
-  
   @Override
   public void record(AccessEvent event) {
     final long key = event.key();

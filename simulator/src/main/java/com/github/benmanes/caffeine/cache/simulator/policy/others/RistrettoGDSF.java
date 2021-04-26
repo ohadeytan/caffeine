@@ -5,17 +5,19 @@ import static com.google.common.base.Preconditions.checkState;
 import java.util.Set;
 
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.google.common.collect.ImmutableSet;
 import com.typesafe.config.Config;
 
 import akka.japi.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 
+@PolicySpec(name = "others.RistrettoGDSF")
 public class RistrettoGDSF extends GDSF {
 
   public RistrettoGDSF(Config config) {
     super(config);
-    policyStats.setName("others.RistrettoGDSF");
+    // policyStats.setName("others.RistrettoGDSF");
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */

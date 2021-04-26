@@ -78,6 +78,7 @@ public final class Simulator extends AbstractActor {
   private Stopwatch stopwatch;
   private Reporter reporter;
   private Router router;
+  private static String confFile;
 
   @Override
   public void preStart() {
@@ -100,7 +101,8 @@ public final class Simulator extends AbstractActor {
   }
 
   private void initialize() {
-    Config config = context().system().settings().config().getConfig("caffeine.simulator");
+    //Config config = context().system().settings().config().getConfig("caffeine.simulator");
+    Config config = ConfigFactory.load(confFile).getConfig("caffeine.simulator");
     settings = new BasicSettings(config);
 
     traceReader = makeTraceReader();

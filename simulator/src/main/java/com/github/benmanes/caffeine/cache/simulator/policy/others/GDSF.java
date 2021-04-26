@@ -16,6 +16,7 @@
 package com.github.benmanes.caffeine.cache.simulator.policy.others;
 
 import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic.WEIGHTED;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import static com.google.common.base.Preconditions.checkState;
 
 import java.util.Comparator;
@@ -26,7 +27,6 @@ import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
 
 import akka.japi.Pair;
@@ -45,6 +45,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
  * 
  * @author ohadey@gmail.com (Ohad Eytan)
  */
+@PolicySpec(name = "others.GDFS", characteristics = WEIGHTED)
 public class GDSF implements Policy {
   protected final PolicyStats policyStats;
   protected final long maximumSize;
@@ -57,8 +58,8 @@ public class GDSF implements Policy {
   
   public GDSF(Config config) {
     BasicSettings settings = new BasicSettings(config);
-    this.policyStats = new PolicyStats("others.GDSF");
-    this.maximumSize = settings.maximumSizeLong();
+    this.policyStats = new PolicyStats(name());
+    this.maximumSize = settings.maximumSize();
     this.data = new Long2ObjectOpenHashMap<>();
     this.priorityQueue = new ObjectAVLTreeSet<Pair<Double,Long>>(new Comparator<Pair<Double,Long>>() {
       @Override
@@ -73,11 +74,6 @@ public class GDSF implements Policy {
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config) {
     return ImmutableSet.of(new GDSF(config));
-  }
-
-  @Override
-  public Set<Characteristic> characteristics() {
-    return Sets.immutableEnumSet(WEIGHTED);
   }
 
   @Override

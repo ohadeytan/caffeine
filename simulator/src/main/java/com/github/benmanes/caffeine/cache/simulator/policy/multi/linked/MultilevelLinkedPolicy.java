@@ -18,8 +18,6 @@ package com.github.benmanes.caffeine.cache.simulator.policy.multi.linked;
 import static java.util.Locale.US;
 import static java.util.stream.Collectors.toSet;
 
-import java.util.Arrays;
-
 import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic.WEIGHTED;
 
 import java.util.Set;
@@ -33,11 +31,9 @@ import com.github.benmanes.caffeine.cache.simulator.admission.Admittor;
 import com.github.benmanes.caffeine.cache.simulator.policy.AccessEvent;
 import com.github.benmanes.caffeine.cache.simulator.policy.MultilevelPolicyStats;
 import com.github.benmanes.caffeine.cache.simulator.policy.Policy;
-import com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic;
-import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.MultilevelLinkedPolicy.Node;
+import com.github.benmanes.caffeine.cache.simulator.policy.Policy.PolicySpec;
 import com.github.benmanes.caffeine.cache.simulator.policy.PolicyStats;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.Sets;
 import com.typesafe.config.Config;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -49,6 +45,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
+@PolicySpec(characteristics = WEIGHTED)
 public final class MultilevelLinkedPolicy implements Policy {
   final int levels;
   final Long2ObjectMap<Node> data;
@@ -62,12 +59,13 @@ public final class MultilevelLinkedPolicy implements Policy {
   final static boolean debug = false;
   final static boolean stats = true;
   
-  public MultilevelLinkedPolicy(Admission admission, EvictionPolicy policy, Config config) {
+  public MultilevelLinkedPolicy(Config config, Set<Characteristic> characteristics,
+      Admission admission, EvictionPolicy policy) {
     BasicSettings settings = new BasicSettings(config);
     this.data = new Long2ObjectOpenHashMap<>();
     this.maximumSize = settings.multilevelMaximumSize().stream().mapToLong(l -> l).toArray();
     this.levels = maximumSize.length;
-    this.policyStats = new MultilevelPolicyStats(admission.format("multi." + policy.label()), levels);
+    this.policyStats = new MultilevelPolicyStats(admission.format(policy.label()), levels);
     this.admittor = admission.from(config, policyStats);
     this.sentinels = Stream.generate(() -> new Node()).limit(levels).toArray(Node[]::new);
     this.policy = policy;
@@ -75,16 +73,11 @@ public final class MultilevelLinkedPolicy implements Policy {
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
-  public static Set<Policy> policies(Config config, EvictionPolicy policy) {
+  public static Set<Policy> policies(Config config, Set<Characteristic> characteristics, EvictionPolicy policy) {
     BasicSettings settings = new BasicSettings(config);
     return settings.admission().stream().map(admission ->
-      new MultilevelLinkedPolicy(admission, policy, config)
+      new MultilevelLinkedPolicy(config, characteristics, admission, policy)
     ).collect(toSet());
-  }
-
-  @Override
-  public Set<Characteristic> characteristics() {
-    return Sets.immutableEnumSet(WEIGHTED);  
   }
 
   @Override
@@ -243,7 +236,7 @@ public final class MultilevelLinkedPolicy implements Policy {
     };
 
     public String label() {
-      return StringUtils.capitalize(name().toLowerCase(US));
+      return "multi." + StringUtils.capitalize(name().toLowerCase(US));
     }
 
     /** Performs any operations required by the policy after a node was successfully retrieved. */

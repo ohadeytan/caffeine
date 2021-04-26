@@ -7,8 +7,8 @@ public final class MultilevelPolicyStats extends PolicyStats {
   private final long missesWeights[];
 
 
-  public MultilevelPolicyStats(String name, int levels) {
-    super(name);
+  public MultilevelPolicyStats(String name, int levels, Object... args) {
+    super(name, args);
     this.missCounts = new long[levels];
     this.hitCounts = new long[levels];
     this.hitsWeights = new long[levels];

@@ -137,6 +137,7 @@ public final class Registry {
     registerTwoQueue();
     registerAdaptive();
     registerGreedyDual();
+    registerMultilevel();
   }
 
   /** Registers the policy based on the annotated name. */
@@ -183,15 +184,16 @@ public final class Registry {
     registerMany(SegmentedLruPolicy.class, SegmentedLruPolicy::policies);
   }
 
-  private void registerMultilevel(Map<String, Function<Config, Set<Policy>>> factories) {
+  private void registerMultilevel() {
     Stream.of(MultilevelLinkedPolicy.EvictionPolicy.values()).forEach(priority -> {
-      String id = "multi." + priority.name();
-      factories.put(id, config -> MultilevelLinkedPolicy.policies(config, priority));
+      registerMany(priority.label(), MultilevelLinkedPolicy.class,
+          config -> MultilevelLinkedPolicy.policies(config, characteristics, priority));
     });
-    factories.put("multi.BidiTinyLfu", BidiTinyLfuPolicy::policies);
+    registerMany(BidiTinyLfuPolicy.class, BidiTinyLfuPolicy::policies);
   }
 
-  private void registerSampled(Map<String, Function<Config, Set<Policy>>> factories) {
+
+  private void registerSampled() {
     Stream.of(SampledPolicy.EvictionPolicy.values()).forEach(priority -> {
       registerMany(priority.label(), SampledPolicy.class,
           config -> SampledPolicy.policies(config, priority));

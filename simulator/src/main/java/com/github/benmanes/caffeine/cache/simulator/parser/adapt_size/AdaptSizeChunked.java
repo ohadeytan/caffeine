@@ -15,7 +15,6 @@
  */
 package com.github.benmanes.caffeine.cache.simulator.parser.adapt_size;
 
-import java.io.IOException;
 import java.math.RoundingMode;
 import java.util.stream.LongStream;
 
@@ -38,7 +37,7 @@ public final class AdaptSizeChunked extends TextTraceReader implements KeyOnlyTr
   }
 
   @Override
-  public LongStream keys() throws IOException {
+  public LongStream keys() {
     return lines().flatMapToLong( line -> {
         String[] array = line.split(" ", 4);
         long key = Long.parseLong(array[1]);
