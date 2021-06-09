@@ -22,6 +22,9 @@ import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Charact
 
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.Random;
+
+import org.apache.commons.lang3.StringUtils;
 
 import com.github.benmanes.caffeine.cache.simulator.BasicSettings;
 import com.github.benmanes.caffeine.cache.simulator.admission.Admission;
@@ -43,8 +46,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  *
  * @author ben.manes@gmail.com (Ben Manes)
  */
-@PolicySpec(name = "multi.Demote", characteristics = WEIGHTED)
-public final class Demote implements Policy {
+@PolicySpec(name = "multi.Promote", characteristics = WEIGHTED)
+public final class Promote implements Policy {
   final int levels;
   final Long2ObjectMap<Node> data;
   final MultilevelPolicyStats policyStats;
@@ -55,24 +58,26 @@ public final class Demote implements Policy {
   long levelTwoWrites;
   final static boolean debug = false;
   final static boolean stats = true;
+  private final Random random;
   
-  public Demote(Config config, Set<Characteristic> characteristics,
+  public Promote(Config config, Set<Characteristic> characteristics,
       Admission admission) {
     BasicSettings settings = new BasicSettings(config);
     this.data = new Long2ObjectOpenHashMap<>();
     this.maximumSize = settings.multilevelMaximumSize().stream().mapToLong(l -> l).toArray();
     this.levels = maximumSize.length;
-    this.policyStats = new MultilevelPolicyStats("multi.Demote", levels);
+    this.policyStats = new MultilevelPolicyStats("multi.Promote", levels);
     this.admittor = admission.from(config, policyStats);
     this.sentinels = Stream.generate(() -> new Node()).limit(levels).toArray(Node[]::new);
     this.currentSizes = new long[levels];
+    this.random = new Random(settings.randomSeed());
   }
 
   /** Returns all variations of this policy based on the configuration parameters. */
   public static Set<Policy> policies(Config config, Set<Characteristic> characteristics) {
     BasicSettings settings = new BasicSettings(config);
     return settings.admission().stream().map(admission ->
-      new Demote(config, characteristics, admission)
+      new Promote(config, characteristics, admission)
     ).collect(toSet());
   }
 
@@ -135,6 +140,10 @@ public final class Demote implements Policy {
       }
     }
     printCache();
+  }
+
+  private boolean shouldPromoteUpwards() {
+    return this.random.nextDouble() < 0.5;
   }
   
   private void printCache() {

@@ -50,6 +50,7 @@ import com.github.benmanes.caffeine.cache.simulator.policy.linked.S4LruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.linked.SegmentedLruPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.MultilevelLinkedPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.Demote;
+import com.github.benmanes.caffeine.cache.simulator.policy.multi.linked.Promote;
 import com.github.benmanes.caffeine.cache.simulator.policy.multi.BidiTinyLfuPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.ClairvoyantPolicy;
 import com.github.benmanes.caffeine.cache.simulator.policy.opt.UnboundedPolicy;
@@ -190,8 +191,8 @@ public final class Registry {
       registerMany(priority.label(), MultilevelLinkedPolicy.class,
           config -> MultilevelLinkedPolicy.policies(config, characteristics, priority));
     });
-    registerMany(Demote.class,
-          config -> Demote.policies(config, characteristics));
+    registerMany(Demote.class, config -> Demote.policies(config, characteristics));
+    registerMany(Promote.class, config -> Promote.policies(config, characteristics));
     registerMany(BidiTinyLfuPolicy.class, BidiTinyLfuPolicy::policies);
   }
 
