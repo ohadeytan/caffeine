@@ -18,6 +18,8 @@ package com.github.benmanes.caffeine.cache.simulator.policy.multi.linked;
 import static java.util.Locale.US;
 import static java.util.stream.Collectors.toSet;
 
+import java.util.Arrays;
+
 import static com.github.benmanes.caffeine.cache.simulator.policy.Policy.Characteristic.WEIGHTED;
 
 import java.util.Set;
@@ -60,6 +62,14 @@ public final class Promote implements Policy {
   final static boolean stats = true;
   private final Random random;
   
+  double[] probPromote;
+  double[] sizeRatio;
+  double[] prevRatio;
+  boolean[] adjust;
+  long[] lastAdjust;
+  private final double hintFreq = 0.05;
+  long timestamp;
+
   public Promote(Config config, Set<Characteristic> characteristics,
       Admission admission) {
     BasicSettings settings = new BasicSettings(config);
@@ -70,6 +80,17 @@ public final class Promote implements Policy {
     this.admittor = admission.from(config, policyStats);
     this.sentinels = Stream.generate(() -> new Node()).limit(levels).toArray(Node[]::new);
     this.currentSizes = new long[levels];
+    this.probPromote = new double[levels];
+    this.sizeRatio = new double[levels];
+    this.prevRatio = new double[levels];
+    this.adjust = new boolean[levels];
+    this.lastAdjust = new long[levels];
+    double sumSize = 0;
+    for (int level = 0; level < levels; level++) {
+      sizeRatio[level] = sumSize/(sumSize + maximumSize[level]);
+      sumSize += maximumSize[level];
+      probPromote[level] = sizeRatio[level];
+    }
     this.random = new Random(settings.randomSeed());
   }
 
@@ -88,62 +109,108 @@ public final class Promote implements Policy {
   
   @Override
   public void record(AccessEvent event) {
+    timestamp++;
+    adjustIfNeeded();
     final int weight = event.weight();
     final long key = event.key();
     Node old = data.get(key);
     admittor.record(key);
-    final Node headCandidate = new Node();
-    if (old != null) { // Hit
+    int lowest_level = levels;
+    boolean promoteHint = true;
+    if (old == null) { // Miss
+      policyStats.recordWeightedMiss(weight); 
+      for (int level = 0; level < levels; level++) {
+        policyStats.recordWeightedMiss(weight, level);   
+      }
+    } else { // Hit
       policyStats.recordWeightedHit(weight);
       for (int level = 0; level < old.level; level++) {
         policyStats.recordWeightedMiss(weight, level);           
       }
       policyStats.recordWeightedHit(weight, old.level);
       policyStats.recordOperation();
-      evictEntry(old, old.level, headCandidate);
-      old.level = -1;
-    } else { // Miss
-      policyStats.recordWeightedMiss(weight); 
-      for (int level = 0; level < levels; level++) {
-        policyStats.recordWeightedMiss(weight, level);   
+      lowest_level = old.level;
+      promoteHint = shouldPromoteUpwards(old.level);
+      if (promoteHint) {
+        policyStats.recordEviction();
+        evictEntry(old, old.level);
+      } else {
+        old.moveToTail();
+        old.timestamp = timestamp;
       }
-      Node node = new Node(key, weight, headCandidate, -1);
-      node.appendToTail();
     } 
-    for (int level = 0; level < levels; level++) {
-      while (headCandidate.next.level < level) {
-        Node candidate = headCandidate.next;
-        candidate.level = level;
-        if (candidate.weight > maximumSize[level]) {
-          candidate.moveToTail();
-          continue;
-        }
-        if (level == 1) {
-          levelTwoWrites++;
-        }
-        data.put(candidate.key, candidate);
-        currentSizes[level] += candidate.weight;
-        candidate.sentinel = sentinels[level];
-        candidate.moveToTail();
-        while (currentSizes[level] > maximumSize[level]) {
-          Node victim = sentinels[level].next;
-          policyStats.recordOperation();
-          policyStats.recordEviction();
-    
-          boolean admit = admittor.admit(candidate.key, victim.key);
-          if (admit) {
-            evictEntry(victim, level, headCandidate);
-          } else {
-            evictEntry(candidate, level, headCandidate);
+    for (int level = lowest_level-1; level >=0; level--) {
+      if (promoteHint) {
+        promoteHint = shouldPromoteUpwards(level);
+        if (!promoteHint) {
+          if (weight <= maximumSize[level]) {
+            if (level == 1) {
+              levelTwoWrites++;
+            }
+            Node node = new Node(key, weight, sentinels[level], level, timestamp);
+            data.put(key, node);
+            currentSizes[level] += weight;
+            node.appendToTail();
+            evictWhileNeeded(level, node);
           }
-        }           
+          break;
+        }
       }
     }
     printCache();
   }
 
-  private boolean shouldPromoteUpwards() {
-    return this.random.nextDouble() < 0.5;
+  private void adjustIfNeeded() {
+    for (int level = 1; level < levels; level++) {
+      long levelCacheLife = (long) (cacheLife(level)); 
+      if (levelCacheLife > (maximumSize[level]/2) && (levelCacheLife*hintFreq) < (timestamp - lastAdjust[level])) {
+        //System.out.println(level);
+        //System.out.println(levelCacheLife);
+        //System.out.println(timestamp - lastAdjust[level]);
+        lastAdjust[level] = timestamp;
+        adjust[level] = !adjust[level];
+        if (adjust[level]) {
+          double prev = prevRatio[level];
+          double curr = (double) cacheLife(level - 1)/ (double) (levelCacheLife + cacheLife(level - 1));
+          double f = (2*curr - 1);
+          if ((f > 0 && ((prev-curr) < (hintFreq * (prev-0.5)))) || (f < 0 && ((curr-prev) < (hintFreq * (0.5-prev))))) {
+           probPromote[level] += (1-probPromote[level])*probPromote[level]*f;
+           if (probPromote[level] > sizeRatio[level]) {
+             probPromote[level] = sizeRatio[level];
+           }
+          }
+          //System.out.println(prev + " -> " + curr);
+          //System.out.println(probPromote[level]);
+          prevRatio[level] = curr;
+        }
+      }
+    }
+  }
+
+  private long cacheLife(int level) {
+    return sentinels[level].prev.timestamp - sentinels[level].next.timestamp;
+  }
+
+  private boolean shouldPromoteUpwards(int level) {
+    if (level == 0 || probPromote[level] < this.random.nextDouble()) {
+     return false;
+    } else {
+     return true;
+    } 
+  }
+
+  private void evictWhileNeeded(int level, Node node) {
+    while (currentSizes[level] > maximumSize[level]) {
+      Node victim = sentinels[level].next;
+      policyStats.recordOperation();
+      policyStats.recordEviction();
+      boolean admit = admittor.admit(node.key, victim.key);
+      if (admit) {
+        evictEntry(victim, level);
+      } else {
+        evictEntry(node, level);
+      }
+    }
   }
   
   private void printCache() {
@@ -171,15 +238,15 @@ public final class Promote implements Policy {
       System.out.println("level_2_misses=" + policyStats.missCount(1));
       System.out.println("level_2_writes=" + levelTwoWrites);
       System.out.println("level_2_promotions=" + 0);
+      System.out.println("prob_promote=" + Arrays.toString(probPromote));
+      System.out.println("adapt_ratio=" + Arrays.toString(prevRatio));
     }
   }
 
-  private void evictEntry(Node node, int level, Node headCandidate) {
+  private void evictEntry(Node node, int level) {
     currentSizes[level] -= node.weight;
     data.remove(node.key);
-    node.sentinel = headCandidate;
-    node.level = level;
-    node.moveToTail();
+    node.remove();
   }
 
   /** A node on the double-linked list. */
@@ -192,6 +259,7 @@ public final class Promote implements Policy {
     long key;
     int weight;
     int level;
+    long timestamp;
 
     /** Creates a new sentinel node. */
     public Node() {
@@ -200,14 +268,16 @@ public final class Promote implements Policy {
       this.prev = this;
       this.next = this;
       this.level = Integer.MAX_VALUE;
+      this.timestamp = 0;
     }
 
     /** Creates a new, unlinked node. */
-    public Node(long key, int weight, Node sentinel, int level) {
+    public Node(long key, int weight, Node sentinel, int level, long timestamp) {
       this.sentinel = sentinel;
       this.key = key;
       this.weight = weight;
       this.level = level;
+      this.timestamp = timestamp;
     }
 
     /** Appends the node to the tail of the list. */
