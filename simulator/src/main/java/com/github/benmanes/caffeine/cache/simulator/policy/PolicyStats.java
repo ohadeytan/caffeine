@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -47,6 +49,7 @@ public class PolicyStats {
   private final Map<String, Metric> metrics;
   private final Stopwatch stopwatch;
   private final String name;
+  private final int batch;
 
   private long hitCount;
   private long missCount;
@@ -59,12 +62,15 @@ public class PolicyStats {
   private long rejectedCount;
   private long operationCount;
   private double percentAdaption;
+  private ArrayList<Long> batchHits;
 
   @SuppressWarnings("AnnotateFormatMethod")
   public PolicyStats(String format, Object... args) {
     this.stopwatch = Stopwatch.createUnstarted();
     this.name = String.format(format, args);
     this.metrics = new LinkedHashMap<>();
+    this.batchHits = new ArrayList<Long>();
+    this.batch = 10000;
 
     addMetric(Metric.of("Policy", (Supplier<String>) this::name, OBJECT, true));
     addMetric(Metric.of("Hit Rate", (DoubleSupplier) this::hitRate, PERCENT, true));
@@ -91,6 +97,7 @@ public class PolicyStats {
     addMetric("Average Penalty", this::avergePenalty);
     addMetric("Steps", this::operationCount);
     addMetric("Time", this::stopwatch);
+    addMetric(Metric.of("Batch Hits", (Supplier<String>) this::batchHits, OBJECT, true));
   }
 
   public void addMetric(Metric metric) {
@@ -138,6 +145,8 @@ public class PolicyStats {
   }
 
   public void recordHit() {
+    manageBatch();
+    batchHits.set(batchHits.size()-1, batchHits.get(batchHits.size()-1)+1);
     hitCount++;
   }
 
@@ -145,9 +154,9 @@ public class PolicyStats {
     return hitCount;
   }
 
-  public void addHits(long hits) {
-    hitCount += hits;
-  }
+  //public void addHits(long hits) {
+  //  hitCount += hits;
+  //}
 
   public void recordWeightedHit(int weight) {
     hitsWeight += weight;
@@ -167,6 +176,7 @@ public class PolicyStats {
   }
 
   public void recordMiss() {
+    manageBatch();
     missCount++;
   }
 
@@ -174,9 +184,9 @@ public class PolicyStats {
     return missCount;
   }
 
-  public void addMisses(long misses) {
-    missCount += misses;
-  }
+  //public void addMisses(long misses) {
+  //  missCount += misses;
+  //}
 
   public void recordWeightedMiss(int weight) {
     missesWeight += weight;
@@ -284,6 +294,16 @@ public class PolicyStats {
 
   public double averageMissPenalty() {
     return (missCount == 0) ? 0.0 : missPenalty / missCount;
+  }
+
+  public String batchHits() {
+    return "[" + batchHits.stream().map(Object::toString).collect(Collectors.joining(" ")) + "]";
+  }
+
+  private void manageBatch() {
+    if ((requestCount() % batch) == 0) {
+      batchHits.add(0L);
+    } 
   }
 
   @Override
